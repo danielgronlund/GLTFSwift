@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 // MARK: - GLTF
 struct GLTFContainer: Decodable {
@@ -30,6 +31,81 @@ struct GLTFNode: Decodable {
   let skin: Int?
   let children: [Int]?
   let name: String?
+  let translation: simd_float3
+  let rotation: simd_quatf
+  let scale: simd_float3
+
+  enum CodingKeys: String, CodingKey {
+    case mesh, skin, children, name, translation, rotation, scale, matrix
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+
+    // Optional properties
+    mesh = try container.decodeIfPresent(Int.self, forKey: .mesh)
+    skin = try container.decodeIfPresent(Int.self, forKey: .skin)
+    children = try container.decodeIfPresent([Int].self, forKey: .children)
+    name = try container.decodeIfPresent(String.self, forKey: .name)
+
+    if 
+      let translation = try container.decodeIfPresent([Float].self, forKey: .translation),
+      let rotation = try container.decodeIfPresent([Float].self, forKey: .rotation),
+      let scale = try container.decodeIfPresent([Float].self, forKey: .scale)
+    {
+      self.translation = simd_float3(translation)
+      self.scale = simd_float3(scale)
+      self.rotation = simd_quatf(vector: simd_float4(rotation))
+    } else if let matrix = try container.decodeIfPresent([Float].self, forKey: .matrix) {
+      let decomposed = decomposeMatrix(matrix)
+      self.translation = decomposed.translation
+      self.rotation = decomposed.rotation
+      self.scale = decomposed.scale
+    } else {
+      // Identity transformation
+      self.translation = simd_float3.zero
+      self.scale = simd_float3.one
+      self.rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+    }
+
+    func decomposeMatrix(_ matrix: [Float]) -> (translation: simd_float3, rotation: simd_quatf, scale: simd_float3) {
+      // Ensure the matrix array has 16 elements (4x4 matrix)
+      guard matrix.count == 16 else {
+        fatalError("Matrix must be a 4x4 transformation matrix.")
+      }
+
+      // Extract translation
+      let translation = simd_float3(matrix[12], matrix[13], matrix[14])
+
+      // Extract scale factors
+      let scaleX = simd_length(simd_float3(matrix[0], matrix[1], matrix[2]))
+      let scaleY = simd_length(simd_float3(matrix[4], matrix[5], matrix[6]))
+      let scaleZ = simd_length(simd_float3(matrix[8], matrix[9], matrix[10]))
+      let scale = simd_float3(scaleX, scaleY, scaleZ)
+
+      // Remove scale from the rotation matrix
+      var rotationMatrix = matrix
+      rotationMatrix[0] /= scaleX
+      rotationMatrix[1] /= scaleX
+      rotationMatrix[2] /= scaleX
+      rotationMatrix[4] /= scaleY
+      rotationMatrix[5] /= scaleY
+      rotationMatrix[6] /= scaleY
+      rotationMatrix[8] /= scaleZ
+      rotationMatrix[9] /= scaleZ
+      rotationMatrix[10] /= scaleZ
+
+      // Convert rotation matrix to quaternion
+      let rotation = simd_quaternion(simd_float4x4(
+        simd_float4(rotationMatrix[0], rotationMatrix[1], rotationMatrix[2], 0),
+        simd_float4(rotationMatrix[4], rotationMatrix[5], rotationMatrix[6], 0),
+        simd_float4(rotationMatrix[8], rotationMatrix[9], rotationMatrix[10], 0),
+        simd_float4(0, 0, 0, 1)
+      ))
+
+      return (translation, rotation, scale)
+    }
+  }
 }
 
 // MARK: - Mesh
