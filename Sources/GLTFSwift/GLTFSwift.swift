@@ -1,28 +1,31 @@
 import Foundation
 
 // MARK: - GLTF
-public struct GLTFContainer: Decodable {
-  let scenes: [Scene]
-  let nodes: [Node]
-  let meshes: [Mesh]
-  let skins: [Skin]?
-  let asset: Asset
+struct GLTFContainer: Decodable {
+  let scenes: [GLTFScene]
+  let nodes: [GLTFNode]
+  let meshes: [GLTFMesh]
+  let skins: [GLTFSkin]?
+  let asset: GLTFAsset
+  let buffers: [GLTFBuffer]
+  let bufferViews: [GLTFBufferView]
+  let accessors: [GLTFAccessor]
 }
 
 // MARK: - Asset
-public struct Asset: Decodable {
+struct GLTFAsset: Decodable {
   let version: String
   let generator: String?
 }
 
 // MARK: - Scene
-public struct Scene: Decodable {
+struct GLTFScene: Decodable {
   let nodes: [Int]?
   let name: String?
 }
 
 // MARK: - Node
-public struct Node: Decodable {
+struct GLTFNode: Decodable {
   let mesh: Int?
   let skin: Int?
   let children: [Int]?
@@ -30,19 +33,19 @@ public struct Node: Decodable {
 }
 
 // MARK: - Mesh
-public struct Mesh: Decodable {
-  let primitives: [Primitive]
+struct GLTFMesh: Decodable {
+  let primitives: [GLTFPrimitive]
   let name: String?
 }
 
 // MARK: - Primitive
-public struct Primitive: Decodable {
+struct GLTFPrimitive: Decodable {
   let indices: Int?
-  let attributes: Attributes
+  let attributes: GLTFAttributes
 }
 
 // MARK: - Attributes
-public struct Attributes: Decodable {
+struct GLTFAttributes: Decodable {
   let POSITION: Int?
   let NORMAL: Int?
   let TANGENT: Int?
@@ -54,9 +57,40 @@ public struct Attributes: Decodable {
 }
 
 // MARK: - Skin
-public struct Skin: Decodable {
+struct GLTFSkin: Decodable {
   let inverseBindMatrices: Int?
   let skeleton: Int?
   let joints: [Int]
   let name: String?
+}
+
+struct GLTFAccessor: Decodable {
+  let bufferView: Int
+  let componentType: ComponentType
+  let normalized: Bool?
+  let count: Int
+  let type: String
+  let max: [Float]?
+  let min: [Float]?
+}
+
+// MARK: - Buffer
+struct GLTFBuffer: Decodable {
+  let byteLength: Int
+  let uri: String?
+}
+
+// MARK: - BufferView
+struct GLTFBufferView: Decodable {
+  let buffer: Int
+  let byteOffset: Int
+  let byteLength: Int
+  let byteStride: Int?
+  let target: BufferViewType?
+}
+
+enum BufferViewType: Int, Decodable {
+  case unknown = 0
+  case vertex = 34962
+  case index = 34963
 }
