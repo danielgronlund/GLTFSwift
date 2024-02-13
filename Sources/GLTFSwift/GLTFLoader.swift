@@ -48,6 +48,8 @@ class GLTFLoader {
     var vertices: [Vertex] = []
     var indices: [UInt32] = []
 
+    var indexOffset: Int  = 0
+
     for primitive in mesh.primitives {
       let positions: [simd_float3]
       var colors: [simd_float4]? = nil
@@ -69,9 +71,11 @@ class GLTFLoader {
       }
 
       if let indicesAccessorIndex = primitive.indices {
-        let extractedIndices = try extractIndicesData(for: indicesAccessorIndex, in: gltfContainer)
+        let extractedIndices = try extractIndicesData(for: indicesAccessorIndex, in: gltfContainer, offset: indexOffset)
         indices.append(contentsOf: extractedIndices)
       }
+
+      indexOffset += positions.count
     }
 
     let vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: .storageModeShared)!
@@ -123,7 +127,7 @@ class GLTFLoader {
     return extractedData
   }
 
-  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer) throws -> [UInt32] {
+  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int) throws -> [UInt32] {
     let accessor = gltfContainer.accessors[accessorIndex]
     let bufferView = gltfContainer.bufferViews[accessor.bufferView]
     let buffer = gltfContainer.buffers[bufferView.buffer]
@@ -155,7 +159,7 @@ class GLTFLoader {
       break
     }
 
-    return indices
+    return indices.map { $0 + UInt32(offset)}
   }
 
   private func load(file gltfFile: String) throws -> GLTFContainer {
