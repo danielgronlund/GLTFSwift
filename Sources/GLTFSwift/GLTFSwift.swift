@@ -48,25 +48,18 @@ struct GLTFNode: Decodable {
     children = try container.decodeIfPresent([Int].self, forKey: .children)
     name = try container.decodeIfPresent(String.self, forKey: .name)
 
-    if 
-      let translation = try container.decodeIfPresent([Float].self, forKey: .translation),
-      let rotation = try container.decodeIfPresent([Float].self, forKey: .rotation),
-      let scale = try container.decodeIfPresent([Float].self, forKey: .scale)
-    {
-      self.translation = simd_float3(translation)
-      self.scale = simd_float3(scale)
-      self.rotation = simd_quatf(vector: simd_float4(rotation))
-    } else if let matrix = try container.decodeIfPresent([Float].self, forKey: .matrix) {
-      let decomposed = decomposeMatrix(matrix)
-      self.translation = decomposed.translation
-      self.rotation = decomposed.rotation
-      self.scale = decomposed.scale
-    } else {
-      // Identity transformation
-      self.translation = simd_float3.zero
-      self.scale = simd_float3.one
-      self.rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
-    }
+    let neutralRotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+
+    let translation = try container.decodeIfPresent([Float].self, forKey: .translation).flatMap(simd_float3.init)
+    let rotation = try container.decodeIfPresent([Float].self, forKey: .rotation).flatMap { simd_quatf(vector: simd_float4($0) ) }
+    let scale = try container.decodeIfPresent([Float].self, forKey: .scale).flatMap(simd_float3.init)
+
+    let matrix = try container.decodeIfPresent([Float].self, forKey: .matrix)
+    let decomposed = matrix.flatMap { decomposeMatrix($0) }
+
+    self.translation = translation ?? decomposed?.translation ?? .zero
+    self.rotation = rotation ?? decomposed?.rotation ?? neutralRotation
+    self.scale = scale ?? decomposed?.scale ?? .one
 
     func decomposeMatrix(_ matrix: [Float]) -> (translation: simd_float3, rotation: simd_quatf, scale: simd_float3) {
       // Ensure the matrix array has 16 elements (4x4 matrix)
@@ -145,9 +138,10 @@ struct GLTFAccessor: Decodable {
   let componentType: ComponentType
   let normalized: Bool?
   let count: Int
-  let type: String
+  let type: DataType
   let max: [Float]?
   let min: [Float]?
+  let byteOffset: Int?
 }
 
 // MARK: - Buffer
