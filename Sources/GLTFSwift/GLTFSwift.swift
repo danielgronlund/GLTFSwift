@@ -138,9 +138,10 @@ struct GLTFAccessor: Decodable {
   let componentType: ComponentType
   let normalized: Bool?
   let count: Int
-  let type: String
+  let type: DataType
   let max: [Float]?
   let min: [Float]?
+  let byteOffset: Int?
 }
 
 // MARK: - Buffer
