@@ -14,7 +14,17 @@ open class Node {
   open var scale: simd_float3
   open var rotation: simd_quatf
 
-  init(children: [Node]?, vertexBuffer: MTLBuffer, indexBuffer: MTLBuffer, name: String?, position: simd_float3, scale: simd_float3, rotation: simd_quatf, indexCount: Int) {
+  init(
+    children: [Node]?,
+    vertexBuffer: MTLBuffer,
+    indexBuffer: MTLBuffer,
+    name: String?,
+    position: simd_float3,
+    scale: simd_float3,
+    rotation: simd_quatf,
+    indexCount: Int
+  ) {
+
     self.children = children
     self.name = name
     self.vertexBuffer = vertexBuffer
