@@ -14,6 +14,8 @@ open class Node {
   open var scale: simd_float3
   open var rotation: simd_quatf
 
+  public let boundingBox: (min: simd_float3, max: simd_float3)?
+
   init(
     children: [Node]?,
     vertexBuffer: MTLBuffer,
@@ -22,7 +24,8 @@ open class Node {
     position: simd_float3,
     scale: simd_float3,
     rotation: simd_quatf,
-    indexCount: Int
+    indexCount: Int,
+    boundingBox: (min: simd_float3, max: simd_float3)?
   ) {
 
     self.children = children
@@ -33,6 +36,7 @@ open class Node {
     self.scale = scale
     self.rotation = rotation
     self.indexCount = indexCount
+    self.boundingBox = boundingBox
   }
 
   public subscript(_ name: String) -> Node? {
