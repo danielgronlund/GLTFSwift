@@ -142,6 +142,23 @@ struct GLTFAccessor: Decodable {
   let max: [Float]?
   let min: [Float]?
   let byteOffset: Int?
+
+
+  var boundingBox: (min: simd_float3, max: simd_float3)? {
+    guard
+      type == .vec3,
+      let min,
+      min.count == 3,
+      let max,
+      max.count == 3
+    else {
+      return nil
+    }
+    return (
+      simd_float3(min),
+      simd_float3(max)
+    )
+  }
 }
 
 // MARK: - Buffer

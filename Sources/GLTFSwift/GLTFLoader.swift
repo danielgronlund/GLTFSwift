@@ -26,7 +26,7 @@ class GLTFLoader {
     guard let meshIndex = gltfNode.mesh else { return nil }
     let gltfMesh = gltfContainer.meshes[meshIndex]
 
-    let (vertexBuffer, indexBuffer, indexCount) = try createBuffers(for: gltfMesh, in: gltfContainer)
+    let (vertexBuffer, indexBuffer, indexCount, boundingBox) = try createBuffers(for: gltfMesh, in: gltfContainer)
 
     let childNodes = try gltfNode.children?.compactMap { childIndex in
       try createNode(from: gltfContainer.nodes[childIndex], in: gltfContainer)
@@ -40,15 +40,18 @@ class GLTFLoader {
       position: gltfNode.translation,
       scale: gltfNode.scale,
       rotation: gltfNode.rotation,
-      indexCount: indexCount
+      indexCount: indexCount,
+      boundingBox: boundingBox
     )
   }
 
-  private func createBuffers(for mesh: GLTFMesh, in gltfContainer: GLTFContainer) throws -> (MTLBuffer, MTLBuffer, Int) {
+  private func createBuffers(for mesh: GLTFMesh, in gltfContainer: GLTFContainer) throws -> (MTLBuffer, MTLBuffer, Int, (min: simd_float3, max: simd_float3)?) {
     var vertices: [Vertex] = []
     var indices: [UInt32] = []
 
     var indexOffset: Int  = 0
+
+    var boundingBox: (min: simd_float3, max: simd_float3)?
 
     for primitive in mesh.primitives {
       let positions: [simd_float3]
@@ -56,7 +59,16 @@ class GLTFLoader {
 
       // Extract positions - assuming this must exist
       if let positionAccessorIndex = primitive.attributes.POSITION {
-        positions = try extractData(for: gltfContainer.accessors[positionAccessorIndex], in: gltfContainer)
+        let accessor = gltfContainer.accessors[positionAccessorIndex]
+        positions = try extractData(for: accessor, in: gltfContainer)
+
+        if let accessorBoundingBox = accessor.boundingBox {
+          var newBoundingBox = boundingBox ?? (min: simd_float3(repeating: .greatestFiniteMagnitude), max: simd_float3(repeating: -.greatestFiniteMagnitude))
+          boundingBox = (
+            min(newBoundingBox.min , accessorBoundingBox.min),
+            max(newBoundingBox.max, accessorBoundingBox.max)
+          )
+        }
       } else {
         continue
       }
@@ -81,7 +93,7 @@ class GLTFLoader {
     let vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: .storageModeShared)!
     let indexBuffer = device.makeBuffer(bytes: indices.compactMap { UInt32($0) }, length: indices.count * MemoryLayout<UInt32>.stride, options: .storageModeShared)!
 
-    return (vertexBuffer, indexBuffer, indices.count)
+    return (vertexBuffer, indexBuffer, indices.count, boundingBox)
   }
 
   private func extractData<T: DataInitializable>(for accessor: GLTFAccessor, in gltfContainer: GLTFContainer) throws -> [T] {
