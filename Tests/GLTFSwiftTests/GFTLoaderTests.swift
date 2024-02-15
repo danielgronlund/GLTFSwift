@@ -9,4 +9,9 @@ final class FileLoadingTests: XCTestCase {
     let scene = try Scene.load(from: "simple-cube.gltf", in: Bundle.module, device: device)
     XCTAssertNotNil(scene["Cube"])
   }
+
+  func testLoadFileWithJoints() throws {
+    let scene = try Scene.load(from: "simple-cube-joints.gltf", in: Bundle.module, device: device)
+    XCTAssertNotNil(scene["Armature"])
+  }
 }
