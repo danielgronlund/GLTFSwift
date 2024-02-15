@@ -23,10 +23,7 @@ class GLTFLoader {
   }
 
   private func createNode(from gltfNode: GLTFNode, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> Node? {
-    guard let meshIndex = gltfNode.mesh else { return nil }
-    let gltfMesh = gltfContainer.meshes[meshIndex]
-
-    let (vertexBuffer, indexBuffer, indexCount, boundingBox) = try createBuffers(for: gltfMesh, in: gltfContainer, in: bundle)
+    let mesh = try mesh(from: gltfNode, in: gltfContainer, in: bundle)
 
     let childNodes = try gltfNode.children?.compactMap { childIndex in
       try createNode(from: gltfContainer.nodes[childIndex], in: gltfContainer, in: bundle)
@@ -35,15 +32,20 @@ class GLTFLoader {
     return Node(
       children: childNodes,
       joints: [],
-      vertexBuffer: vertexBuffer,
-      indexBuffer: indexBuffer,
+      mesh: mesh,
       name: gltfNode.name,
       position: gltfNode.translation,
       scale: gltfNode.scale,
-      rotation: gltfNode.rotation,
-      indexCount: indexCount,
-      boundingBox: boundingBox
+      rotation: gltfNode.rotation
     )
+  }
+
+  private func mesh(from gltfNode: GLTFNode, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> Mesh? {
+    guard let meshIndex = gltfNode.mesh else { return nil }
+    let gltfMesh = gltfContainer.meshes[meshIndex]
+
+    let (vertexBuffer, indexBuffer, indexCount, boundingBox) = try createBuffers(for: gltfMesh, in: gltfContainer, in: bundle)
+    return Mesh(vertexBuffer: vertexBuffer, indexBuffer: indexBuffer, indexCount: indexCount, boundingBox: boundingBox)
   }
 
   private func createBuffers(for mesh: GLTFMesh, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> (MTLBuffer, MTLBuffer, Int, (min: simd_float3, max: simd_float3)?) {
