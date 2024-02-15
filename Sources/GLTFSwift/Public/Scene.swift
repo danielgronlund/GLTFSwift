@@ -36,13 +36,14 @@ open class Scene {
   ///
   /// - Parameters:
   ///   - filename: The name of the GLTF file to load. This should include the `.glft` filetype ending.
+  ///   - bundle: Bundle where the file is loacated, defautls to the main application bundle.
   ///   - device: The `MTLDevice` used for creating Metal buffers required for the `Scene`'s geometry.
   /// - Returns: The first `Scene` object found within the GLTF file.
   /// - Throws: `SceneLoadingError.sceneNotFound` if no scenes are present in the GLTF file.
   /// - Note: This function only loads the first scene found in the GLTF file and does not handle multiple scenes.
-  public static func load(from filename: String, device: MTLDevice) throws -> Scene {
+  public static func load(from filename: String, in bundle: Bundle = Bundle.main, device: MTLDevice) throws -> Scene {
     let loader = GLTFLoader(device: device)
-    let scenes = try loader.load(path: filename)
+    let scenes = try loader.load(path: filename, in: bundle)
 
     guard let scene = scenes.first else {
       throw SceneLoadingError.sceneNotFound

@@ -15,7 +15,7 @@ struct FileReader {
     }
   }
 
-  static func readFile(_ filename: String?, in bundle: Bundle = .main) throws -> Data {
+  static func readFile(_ filename: String?, in bundle: Bundle) throws -> Data {
     guard let filename else {
       throw Error.emptyFilename
     }
