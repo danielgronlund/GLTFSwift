@@ -7,6 +7,7 @@ open class Node {
   public var indexBuffer: MTLBuffer
 
   public let children: [Node]?
+  public let joints: [Joint]?
   public let name: String?
   public let indexCount: Int
 
@@ -18,6 +19,7 @@ open class Node {
 
   init(
     children: [Node]?,
+    joints: [Joint]?,
     vertexBuffer: MTLBuffer,
     indexBuffer: MTLBuffer,
     name: String?,
@@ -37,6 +39,7 @@ open class Node {
     self.rotation = rotation
     self.indexCount = indexCount
     self.boundingBox = boundingBox
+    self.joints = joints
   }
 
   public subscript(_ name: String) -> Node? {

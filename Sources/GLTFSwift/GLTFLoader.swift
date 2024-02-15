@@ -34,6 +34,7 @@ class GLTFLoader {
 
     return Node(
       children: childNodes,
+      joints: [],
       vertexBuffer: vertexBuffer,
       indexBuffer: indexBuffer,
       name: gltfNode.name,
