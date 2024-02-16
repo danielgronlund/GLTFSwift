@@ -9,116 +9,118 @@ class GLTFLoader {
     self.device = device
   }
 
-  func load(path: String, in bundle: Bundle) throws -> [Scene] {
-    let gltfContainer = try load(file: path, in: bundle)
-
-    let scenes = try gltfContainer.scenes.map { scene -> Scene in
-      let sceneNodes = try scene.nodes?.compactMap { nodeIndex in
-        try createNode(from: gltfContainer.nodes[nodeIndex], in: gltfContainer, in: bundle)
-      }
-      return Scene(nodes: sceneNodes, name: scene.name)
+  func extractData(forAccessor accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> Data? {
+    guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
+      return nil
     }
+    let accessor = gltfContainer.accessors[accessorIndex]
+    let bufferView = gltfContainer.bufferViews[accessor.bufferView]
+    let descriptor = BufferTypeDescriptor(componentType: accessor.componentType, dataType: accessor.type)
+    let totalSize = descriptor.totalSize * accessor.count
+    let buffer = gltfContainer.buffers[bufferView.buffer]
 
-    return scenes
+    return self.dataForBuffer(buffer, offset: bufferView.byteOffset + (accessor.byteOffset ?? 0), length: totalSize, in: bundle)
   }
 
-  private func createNode(from gltfNode: GLTFNode, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> Node? {
-    let mesh = try mesh(from: gltfNode, in: gltfContainer, in: bundle)
+  func extractBoundingBox(for accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> (min: simd_float3, max: simd_float3)? {
+    guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
+      return nil
+    }
+    
+    let accessor = gltfContainer.accessors[accessorIndex]
 
-    let childNodes = try gltfNode.children?.compactMap { childIndex in
-      try createNode(from: gltfContainer.nodes[childIndex], in: gltfContainer, in: bundle)
+    guard let min = accessor.min.flatMap(simd_float3.init), let max = accessor.max.flatMap(simd_float3.init) else {
+      return nil
     }
 
-    return Node(
-      children: childNodes,
-      joints: [],
-      mesh: mesh,
-      name: gltfNode.name,
-      position: gltfNode.translation,
-      scale: gltfNode.scale,
-      rotation: gltfNode.rotation
+    return (min, max)
+  }
+
+  func loadContainer(path: String, in bundle: Bundle) throws -> GLTFAsset {
+    let gltfContainer = try load(file: path, in: bundle)
+
+    return GLTFAsset(
+      scenes: gltfContainer.scenes,
+      nodes: gltfContainer.nodes,
+      meshes: try mapMeshes(of: gltfContainer, in: bundle),
+      skins: gltfContainer.skins,
+      accessors: gltfContainer.accessors
     )
   }
 
-  private func mesh(from gltfNode: GLTFNode, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> Mesh? {
-    guard let meshIndex = gltfNode.mesh else { return nil }
-    let gltfMesh = gltfContainer.meshes[meshIndex]
-
-    let (vertexBuffer, indexBuffer, indexCount, boundingBox) = try createBuffers(for: gltfMesh, in: gltfContainer, in: bundle)
-    return Mesh(vertexBuffer: vertexBuffer, indexBuffer: indexBuffer, indexCount: indexCount, boundingBox: boundingBox)
-  }
-
-  private func createBuffers(for mesh: GLTFMesh, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> (MTLBuffer, MTLBuffer, Int, (min: simd_float3, max: simd_float3)?) {
-    var vertices: [Vertex] = []
-    var indices: [UInt32] = []
-
-    var indexOffset: Int  = 0
-
-    var boundingBox: (min: simd_float3, max: simd_float3)?
-
-    for primitive in mesh.primitives {
-      let positions: [simd_float3]
-      var colors: [simd_float4]? = nil
-
-      // Extract positions - assuming this must exist
-      if let positionAccessorIndex = primitive.attributes.POSITION {
-        let accessor = gltfContainer.accessors[positionAccessorIndex]
-        positions = try extractData(for: accessor, in: gltfContainer, in: bundle)
-
-        if let accessorBoundingBox = accessor.boundingBox {
-          let newBoundingBox = boundingBox ?? (min: simd_float3(repeating: .greatestFiniteMagnitude), max: simd_float3(repeating: -.greatestFiniteMagnitude))
-          boundingBox = (
-            min(newBoundingBox.min , accessorBoundingBox.min),
-            max(newBoundingBox.max, accessorBoundingBox.max)
-          )
+  func mapMeshes(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [PublicMesh] {
+    return try gltfContainer.meshes.compactMap({ mesh in
+      let publicPrimitives: [PublicPrimitive] = try mesh.primitives.compactMap({ primitive in
+        guard let primtiveInterleavedData = try extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
+          return nil
         }
-      } else {
-        continue
-      }
 
-      if let colorAccessorIndex = primitive.attributes.COLOR_0 {
-        colors = try extractData(for: gltfContainer.accessors[colorAccessorIndex], in: gltfContainer, in: bundle)
-      }
+        guard
+          let vertexBuffer = createMetalBuffer(vertices: primtiveInterleavedData.vertices),
+          let indexBuffer = createIndexBuffer(indices: primtiveInterleavedData.indices)
+        else {
+          return nil
+        }
 
-      for (index, position) in positions.enumerated() {
-        let color = colors?.count ?? 0 > index ? colors![index] : simd_float4(0, 0, 0, 1)
-        vertices.append(Vertex(position: position, color: color))
-      }
+        return PublicPrimitive(
+          indexBuffer: indexBuffer,
+          vertexBuffer: vertexBuffer,
+          indexCount: primtiveInterleavedData.indices.count,
+          boundingBox: primtiveInterleavedData.boundingBox ?? (.zero, .zero)
+        )
+      })
 
-      if let indicesAccessorIndex = primitive.indices {
-        let extractedIndices = try extractIndicesData(for: indicesAccessorIndex, in: gltfContainer, in: bundle, offset: indexOffset)
-        indices.append(contentsOf: extractedIndices)
-      }
-
-      indexOffset += positions.count
-    }
-
-    let vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Vertex>.stride, options: .storageModeShared)!
-    let indexBuffer = device.makeBuffer(bytes: indices.compactMap { UInt32($0) }, length: indices.count * MemoryLayout<UInt32>.stride, options: .storageModeShared)!
-
-    return (vertexBuffer, indexBuffer, indices.count, boundingBox)
+      return PublicMesh(primitives: publicPrimitives)
+    })
   }
 
-  private func extractData<T: DataInitializable>(for accessor: GLTFAccessor, in gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [T] {
-    let bufferView = gltfContainer.bufferViews[accessor.bufferView]
-    let buffer = gltfContainer.buffers[bufferView.buffer]
-    let binaryData = try FileReader.readFile(buffer.uri, in: bundle)
-
-    let dataStart = bufferView.byteOffset + (accessor.byteOffset ?? 0)
-    let strideBy = bufferView.byteStride ?? accessor.componentType.size * accessor.type.numberOfComponents
-    let dataEnd = dataStart + strideBy * accessor.count
-
-    var extractedData: [T] = []
-    for offset in stride(from: dataStart, to: dataEnd, by: strideBy) {
-      if let value = T(fromBinaryData: binaryData, byteOffset: offset) {
-        extractedData.append(value)
-      }
+  func createMetalBuffer(vertices: [Vertex]) -> MTLBuffer? {
+    let bufferSize = vertices.count * MemoryLayout<Vertex>.stride
+    guard let buffer = device.makeBuffer(length: bufferSize, options: .storageModeShared) else {
+      print("Failed to create Metal buffer")
+      return nil
     }
 
-    return extractedData
+    buffer.contents().copyMemory(from: vertices, byteCount: bufferSize)
+    return buffer
   }
 
-  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, in bundle: Bundle, offset: Int) throws -> [UInt32] {
+  func createIndexBuffer(indices: [UInt32]) -> MTLBuffer? {
+    let bufferSize = indices.count * MemoryLayout<UInt32>.size
+    guard let buffer = device.makeBuffer(length: bufferSize, options: .storageModeShared) else {
+      print("Failed to create index buffer")
+      return nil
+    }
+
+    buffer.contents().copyMemory(from: indices, byteCount: bufferSize)
+    return buffer
+  }
+
+  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, in bundle: Bundle) throws -> (vertices: [Vertex], indices: [UInt32], boundingBox: (min: simd_float3, max: simd_float3)?)? {
+    guard
+      let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
+      let indicesAccessorIndex = primitive.indices
+    else {
+      return nil
+    }
+
+    let indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, in: bundle)
+    let boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
+
+    let positions: [simd_float3] = try .from(data: positionsData)
+
+    // TODO: Support colors
+
+    var vertices: [Vertex] = []
+    for position in positions {
+      let vertex = Vertex(position: position, color: simd_float4(0,0,0,1))
+      vertices.append(vertex)
+    }
+
+    return (vertices: vertices, indices: indices, boundingBox: boundingBox)
+  }
+
+  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, in bundle: Bundle) throws -> [UInt32] {
     let accessor = gltfContainer.accessors[accessorIndex]
     let bufferView = gltfContainer.bufferViews[accessor.bufferView]
     let buffer = gltfContainer.buffers[bufferView.buffer]
@@ -151,6 +153,20 @@ class GLTFLoader {
     }
 
     return indices.map { $0 + UInt32(offset)}
+  }
+
+  func dataForBuffer(_ buffer: GLTFBuffer, offset: Int, length: Int, in bundle: Bundle) -> Data {
+    do {
+      let fileData = try FileReader.readFile(buffer.uri, in: bundle)
+      guard offset + length <= fileData.count else {
+        print("Requested data range exceeds file size.")
+        return Data()
+      }
+      return fileData.subdata(in: offset..<(offset + length))
+    } catch {
+      print("Failed to read buffer data: \(error.localizedDescription)")
+      return Data()
+    }
   }
 
   private func load(file gltfFile: String, in bundle: Bundle) throws -> GLTFContainer {

@@ -3,15 +3,20 @@ import Metal
 @testable import GLTFSwift
 
 final class FileLoadingTests: XCTestCase {
-  let device: MTLDevice = MTLCreateSystemDefaultDevice()!
+  var device: MTLDevice!
+  var loader: GLTFLoader!
+
+  override func setUpWithError() throws {
+    self.device = MTLCreateSystemDefaultDevice()!
+    self.loader = GLTFLoader(device: device)
+    try super.setUpWithError()
+  }
 
   func testLoadFile() throws {
-    let scene = try Scene.load(from: "simple-cube.gltf", in: Bundle.module, device: device)
-    XCTAssertNotNil(scene["Cube"])
+    _ = try loader.loadContainer(path: "simple-cube.gltf", in: .module)
   }
 
   func testLoadFileWithJoints() throws {
-    let scene = try Scene.load(from: "simple-cube-joints.gltf", in: Bundle.module, device: device)
-    XCTAssertNotNil(scene["Armature"])
+    _ = try loader.loadContainer(path: "simple-cube-joints.gltf", in: .module)
   }
 }

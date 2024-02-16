@@ -1,6 +1,6 @@
 import simd
 
-struct Vertex {
-  var position: simd_float3
-  var color: simd_float4
+public struct Vertex {
+  public var position: simd_float3
+  public var color: simd_float4
 }
