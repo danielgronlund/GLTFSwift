@@ -26,7 +26,7 @@ class GLTFLoader {
     guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
       return nil
     }
-    
+
     let accessor = gltfContainer.accessors[accessorIndex]
 
     guard let min = accessor.min.flatMap(simd_float3.init), let max = accessor.max.flatMap(simd_float3.init) else {
@@ -109,11 +109,32 @@ class GLTFLoader {
 
     let positions: [simd_float3] = try .from(data: positionsData)
 
+    let joints: [simd_short4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
+      guard let data = extractData(forAccessor:jointsAccessorIndex, fromContainer:container, in:bundle) else {
+        return nil
+      }
+
+      return try .from(data: data)
+    }
+
+    let weights: [simd_float4]? = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
+      guard let data = extractData(forAccessor:weightsAccessorIndex, fromContainer:container, in:bundle) else {
+        return nil
+      }
+
+      return try .from(data: data)
+    }
+
     // TODO: Support colors
 
     var vertices: [Vertex] = []
-    for position in positions {
-      let vertex = Vertex(position: position, color: simd_float4(0,0,0,1))
+    for (index, position) in positions.enumerated() {
+      let vertex = Vertex(
+        position: position,
+        color: simd_float4(0,0,0,1),
+        joints: joints?[safe: index],
+        weights: weights?[safe: index]
+      )
       vertices.append(vertex)
     }
 

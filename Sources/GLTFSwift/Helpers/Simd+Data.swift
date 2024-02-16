@@ -46,3 +46,16 @@ extension [simd_float4] {
     return result
   }
 }
+
+extension [simd_short4] {
+  static func from(data: Data) throws -> [simd_short4] {
+    guard data.count % MemoryLayout<simd_short4>.size == 0 else {
+      throw NSError(domain: "InvalidDataError", code: 100, userInfo: [NSLocalizedDescriptionKey: "Data size is not aligned with simd_short4 size."])
+    }
+
+    return data.withUnsafeBytes { bufferPointer -> [simd_short4] in
+      let count = data.count / MemoryLayout<simd_short4>.size
+      return Array(UnsafeBufferPointer<simd_short4>(start: bufferPointer.baseAddress!.assumingMemoryBound(to: simd_short4.self), count: count))
+    }
+  }
+}
