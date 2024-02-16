@@ -35,7 +35,7 @@ public class GLTFNode: Decodable {
   public let scale: simd_float3
 
   public let skin: Int?
-  let name: String?
+  public let name: String?
 
   enum CodingKeys: String, CodingKey {
     case mesh, skin, children, name, translation, rotation, scale, matrix
