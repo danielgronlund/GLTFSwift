@@ -21,13 +21,13 @@ struct GLTFAssetInfo: Decodable {
 }
 
 // MARK: - Scene
-public struct GLTFScene: Decodable {
+public class GLTFScene: Decodable {
   public let nodes: [Int]?
   let name: String?
 }
 
 // MARK: - Node
-public struct GLTFNode: Decodable {
+public class GLTFNode: Decodable {
   public let mesh: Int?
   public let children: [Int]?
   public let translation: simd_float3
@@ -41,7 +41,7 @@ public struct GLTFNode: Decodable {
     case mesh, skin, children, name, translation, rotation, scale, matrix
   }
 
-  public init(from decoder: Decoder) throws {
+  required public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
 
     // Optional properties

@@ -13,15 +13,20 @@ public struct PublicMesh {
   public let primitives: [PublicPrimitive]
 }
 
+public struct PublicSkin {
+  public let inverseBindMatrixBuffer: MTLBuffer
+  public let joints: [Int]
+}
+
 public class GLTFAsset {
   public let scenes: [GLTFScene]
   public let nodes: [GLTFNode]
   public let meshes: [PublicMesh]
 
-  public let skins: [GLTFSkin]?
+  public let skins: [PublicSkin]?
   let accessors: [GLTFAccessor]
 
-  init(scenes: [GLTFScene], nodes: [GLTFNode], meshes: [PublicMesh], skins: [GLTFSkin]?, accessors: [GLTFAccessor]) {
+  init(scenes: [GLTFScene], nodes: [GLTFNode], meshes: [PublicMesh], skins: [PublicSkin]?, accessors: [GLTFAccessor]) {
     self.scenes = scenes
     self.nodes = nodes
     self.meshes = meshes

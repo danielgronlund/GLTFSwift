@@ -43,12 +43,32 @@ class GLTFLoader {
       scenes: gltfContainer.scenes,
       nodes: gltfContainer.nodes,
       meshes: try mapMeshes(of: gltfContainer, in: bundle),
-      skins: gltfContainer.skins,
+      skins: try mapSkins(of: gltfContainer, in: bundle),
       accessors: gltfContainer.accessors
     )
   }
 
+  func mapSkins(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [PublicSkin] {
+    // TODO: Clean up implementation for readiblity.
+
+    return try gltfContainer.skins?.compactMap { skin in
+      guard let data = extractData(forAccessor: skin.inverseBindMatrices, fromContainer: gltfContainer, in: bundle) else {
+        return nil
+      }
+
+      let inverseMatrices: [simd_float4x4] = try .from(data: data)
+
+      guard let buffer = inverseMatrices.createMetalBuffer(device: device) else {
+        return nil
+      }
+
+      return PublicSkin(inverseBindMatrixBuffer: buffer, joints: skin.joints)
+    } ?? []
+  }
+
   func mapMeshes(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [PublicMesh] {
+    // TODO: Clean up implementation for readiblity.
+
     return try gltfContainer.meshes.compactMap({ mesh in
       let publicPrimitives: [PublicPrimitive] = try mesh.primitives.compactMap({ primitive in
         guard let primtiveInterleavedData = try extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
@@ -56,8 +76,8 @@ class GLTFLoader {
         }
 
         guard
-          let vertexBuffer = createMetalBuffer(vertices: primtiveInterleavedData.vertices),
-          let indexBuffer = createIndexBuffer(indices: primtiveInterleavedData.indices)
+          let vertexBuffer = primtiveInterleavedData.vertices.createMetalBuffer(device: device),
+          let indexBuffer = primtiveInterleavedData.indices.createMetalBuffer(device: device)
         else {
           return nil
         }
@@ -72,28 +92,6 @@ class GLTFLoader {
 
       return PublicMesh(primitives: publicPrimitives)
     })
-  }
-
-  func createMetalBuffer(vertices: [Vertex]) -> MTLBuffer? {
-    let bufferSize = vertices.count * MemoryLayout<Vertex>.stride
-    guard let buffer = device.makeBuffer(length: bufferSize, options: .storageModeShared) else {
-      print("Failed to create Metal buffer")
-      return nil
-    }
-
-    buffer.contents().copyMemory(from: vertices, byteCount: bufferSize)
-    return buffer
-  }
-
-  func createIndexBuffer(indices: [UInt32]) -> MTLBuffer? {
-    let bufferSize = indices.count * MemoryLayout<UInt32>.size
-    guard let buffer = device.makeBuffer(length: bufferSize, options: .storageModeShared) else {
-      print("Failed to create index buffer")
-      return nil
-    }
-
-    buffer.contents().copyMemory(from: indices, byteCount: bufferSize)
-    return buffer
   }
 
   func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, in bundle: Bundle) throws -> (vertices: [Vertex], indices: [UInt32], boundingBox: (min: simd_float3, max: simd_float3)?)? {
