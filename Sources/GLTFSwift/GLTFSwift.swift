@@ -128,9 +128,9 @@ struct GLTFAttributes: Decodable {
 }
 
 // MARK: - Skin
-struct GLTFSkin: Decodable {
-  let inverseBindMatrices: Int?
-  let joints: [Int]
+public struct GLTFSkin: Decodable {
+  public let inverseBindMatrices: Int?
+  public let joints: [Int]
   let name: String?
 
   enum CodingKeys: CodingKey {
@@ -140,7 +140,7 @@ struct GLTFSkin: Decodable {
     case name
   }
 
-  init(from decoder: Decoder) throws {
+  public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.inverseBindMatrices = try container.decodeIfPresent(Int.self, forKey: .inverseBindMatrices)
     self.joints = try container.decode([Int].self, forKey: .joints)

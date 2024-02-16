@@ -18,7 +18,7 @@ public class GLTFAsset {
   public let nodes: [GLTFNode]
   public let meshes: [PublicMesh]
 
-  let skins: [GLTFSkin]?
+  public let skins: [GLTFSkin]?
   let accessors: [GLTFAccessor]
 
   init(scenes: [GLTFScene], nodes: [GLTFNode], meshes: [PublicMesh], skins: [GLTFSkin]?, accessors: [GLTFAccessor]) {
