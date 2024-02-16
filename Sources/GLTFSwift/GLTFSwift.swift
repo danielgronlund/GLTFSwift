@@ -34,7 +34,7 @@ public struct GLTFNode: Decodable {
   public let rotation: simd_quatf
   public let scale: simd_float3
 
-  let skin: Int?
+  public let skin: Int?
   let name: String?
 
   enum CodingKeys: String, CodingKey {
