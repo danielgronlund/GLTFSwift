@@ -107,7 +107,7 @@ class GLTFLoader {
 
     let positions: [simd_float3] = try .from(data: positionsData)
 
-    let joints: [simd_short4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
+    let joints: [simd_char4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
       guard let data = extractData(forAccessor:jointsAccessorIndex, fromContainer:container, in:bundle) else {
         return nil
       }

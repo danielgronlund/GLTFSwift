@@ -13,7 +13,7 @@ public struct Vertex {
   /// The indices of the joints that influence this vertex, represented as a four-component vector. Each component is an
   /// index into the array of joints in the skeleton. For vertices not influenced by any joint, this can be set to a
   /// default value (e.g., -1). This is used for skeletal animation, where the joints' movements influence the mesh's vertices.
-  public var joints: simd_short4
+  public var joints: simd_char4
 
   /// The weights corresponding to the influence of each joint specified in the `joints` property, represented as a
   /// four-component vector. These weights determine how much each joint affects the vertex's final position. For vertices
@@ -21,12 +21,12 @@ public struct Vertex {
   /// blending but may need normalization in practice.
   public var weights: simd_float4
 
-  static let invalidJointIndices: simd_short4 = simd_short4(-1, -1, -1, -1)
+  static let invalidJointIndices: simd_char4 = simd_char4(-1, -1, -1, -1)
 
   init(
     position: simd_float3,
     color: simd_float4,
-    joints: simd_short4?,
+    joints: simd_char4?,
     weights: simd_float4?
   ) {
     self.position = position
