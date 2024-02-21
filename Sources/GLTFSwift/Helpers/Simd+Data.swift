@@ -47,15 +47,15 @@ extension [simd_float4] {
   }
 }
 
-extension [simd_char4] {
-  static func from(data: Data) throws -> [simd_char4] {
-    guard data.count % MemoryLayout<simd_char4>.size == 0 else {
-      throw NSError(domain: "InvalidDataError", code: 100, userInfo: [NSLocalizedDescriptionKey: "Data size is not aligned with simd_char4 size."])
+extension [simd_uchar4] {
+  static func from(data: Data) throws -> [simd_uchar4] {
+    guard data.count % MemoryLayout<simd_uchar4>.size == 0 else {
+      throw NSError(domain: "InvalidDataError", code: 100, userInfo: [NSLocalizedDescriptionKey: "Data size is not aligned with simd_uchar4 size."])
     }
 
-    return data.withUnsafeBytes { bufferPointer -> [simd_char4] in
-      let count = data.count / MemoryLayout<simd_char4>.size
-      return Array(UnsafeBufferPointer<simd_char4>(start: bufferPointer.baseAddress!.assumingMemoryBound(to: simd_char4.self), count: count))
+    return data.withUnsafeBytes { bufferPointer -> [simd_uchar4] in
+      let count = data.count / MemoryLayout<simd_uchar4>.size
+      return Array(UnsafeBufferPointer<simd_uchar4>(start: bufferPointer.baseAddress!.assumingMemoryBound(to: simd_uchar4.self), count: count))
     }
   }
 }
