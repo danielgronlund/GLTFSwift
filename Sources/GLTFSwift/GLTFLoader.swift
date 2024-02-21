@@ -58,11 +58,7 @@ class GLTFLoader {
 
       let inverseMatrices: [simd_float4x4] = try .from(data: data)
 
-      guard let buffer = inverseMatrices.createMetalBuffer(device: device) else {
-        return nil
-      }
-
-      return PublicSkin(inverseBindMatrixBuffer: buffer, joints: skin.joints)
+      return PublicSkin(inverseBindMatrices: inverseMatrices, joints: skin.joints)
     } ?? []
   }
 

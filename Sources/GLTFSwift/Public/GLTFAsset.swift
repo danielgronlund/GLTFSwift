@@ -14,7 +14,7 @@ public struct PublicMesh {
 }
 
 public struct PublicSkin {
-  public let inverseBindMatrixBuffer: MTLBuffer
+  public let inverseBindMatrices: [simd_float4x4]
   public let joints: [Int]
 }
 
