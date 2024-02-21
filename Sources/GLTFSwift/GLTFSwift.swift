@@ -1,6 +1,5 @@
 import Foundation
 import simd
-import Metal
 
 // MARK: - GLTF
 struct GLTFContainer: Decodable {

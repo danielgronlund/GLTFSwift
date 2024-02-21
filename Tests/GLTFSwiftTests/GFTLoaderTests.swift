@@ -1,5 +1,4 @@
 import XCTest
-import Metal
 @testable import GLTFSwift
 
 final class FileLoadingTests: XCTestCase {
@@ -8,7 +7,7 @@ final class FileLoadingTests: XCTestCase {
 
   override func setUpWithError() throws {
     self.device = MTLCreateSystemDefaultDevice()!
-    self.loader = GLTFLoader(device: device)
+    self.loader = GLTFLoader()
     try super.setUpWithError()
   }
 

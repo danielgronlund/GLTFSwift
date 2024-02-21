@@ -85,8 +85,3 @@ extension [simd_float4x4] {
     }
   }
 }
-
-extension simd_float4x4: MetalBufferable {}
-extension simd_float4: MetalBufferable {}
-extension UInt32: MetalBufferable {}
-extension Vertex: MetalBufferable {}

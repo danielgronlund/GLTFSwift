@@ -1,14 +1,7 @@
 import Foundation
-import Metal
 import simd
 
 class GLTFLoader {
-  let device: MTLDevice
-
-  init(device: MTLDevice) {
-    self.device = device
-  }
-
   func extractData(forAccessor accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> Data? {
     guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
       return nil
@@ -71,17 +64,9 @@ class GLTFLoader {
           return nil
         }
 
-        guard
-          let vertexBuffer = primtiveInterleavedData.vertices.createMetalBuffer(device: device),
-          let indexBuffer = primtiveInterleavedData.indices.createMetalBuffer(device: device)
-        else {
-          return nil
-        }
-
         return PublicPrimitive(
-          indexBuffer: indexBuffer,
-          vertexBuffer: vertexBuffer,
-          indexCount: primtiveInterleavedData.indices.count,
+          indexBuffer: primtiveInterleavedData.indices,
+          vertexBuffer: primtiveInterleavedData.vertices,
           boundingBox: primtiveInterleavedData.boundingBox ?? (.zero, .zero)
         )
       })

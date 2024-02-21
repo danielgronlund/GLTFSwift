@@ -1,11 +1,9 @@
 import Foundation
-import Metal
 import simd
 
 public struct PublicPrimitive {
-  public let indexBuffer: MTLBuffer
-  public let vertexBuffer: MTLBuffer
-  public let indexCount: Int
+  public let indexBuffer: [UInt32]
+  public let vertexBuffer: [Vertex]
   public let boundingBox: (min: simd_float3, max: simd_float3)?
 }
 
@@ -41,7 +39,7 @@ public class GLTFAsset {
   }
 }
 
-public func load(_ filename: String, in bundle: Bundle = .main, device: MTLDevice) throws -> GLTFAsset {
-  let loader = GLTFLoader(device: device)
+public func load(_ filename: String, in bundle: Bundle = .main) throws -> GLTFAsset {
+  let loader = GLTFLoader()
   return try loader.loadContainer(path: filename, in: bundle)
 }
