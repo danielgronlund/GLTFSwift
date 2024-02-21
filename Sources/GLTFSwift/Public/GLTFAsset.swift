@@ -2,8 +2,8 @@ import Foundation
 import simd
 
 public struct PublicPrimitive {
-  public let indexBuffer: [UInt32]
-  public let vertexBuffer: [Vertex]
+  public let indices: [UInt32]
+  public let vertices: [Vertex]
   public let boundingBox: (min: simd_float3, max: simd_float3)?
 }
 

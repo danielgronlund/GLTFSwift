@@ -65,8 +65,8 @@ class GLTFLoader {
         }
 
         return PublicPrimitive(
-          indexBuffer: primtiveInterleavedData.indices,
-          vertexBuffer: primtiveInterleavedData.vertices,
+          indices: primtiveInterleavedData.indices,
+          vertices: primtiveInterleavedData.vertices,
           boundingBox: primtiveInterleavedData.boundingBox ?? (.zero, .zero)
         )
       })
