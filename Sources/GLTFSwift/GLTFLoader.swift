@@ -112,8 +112,6 @@ class GLTFLoader {
       return try .from(data: data)
     }
 
-    // TODO: Support colors
-
     var vertices: [Vertex] = []
     for (index, position) in positions.enumerated() {
       let vertex = Vertex(
