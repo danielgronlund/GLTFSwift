@@ -41,7 +41,7 @@ class GLTFLoader {
     )
   }
 
-  func mapSkins(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [PublicSkin] {
+  func mapSkins(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [Skin] {
     // TODO: Clean up implementation for readiblity.
 
     return try gltfContainer.skins?.compactMap { skin in
@@ -51,27 +51,27 @@ class GLTFLoader {
 
       let inverseMatrices: [simd_float4x4] = try .from(data: data)
 
-      return PublicSkin(inverseBindMatrices: inverseMatrices, joints: skin.joints)
+      return Skin(inverseBindMatrices: inverseMatrices, joints: skin.joints)
     } ?? []
   }
 
-  func mapMeshes(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [PublicMesh] {
+  func mapMeshes(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [Mesh] {
     // TODO: Clean up implementation for readiblity.
 
     return try gltfContainer.meshes.compactMap({ mesh in
-      let publicPrimitives: [PublicPrimitive] = try mesh.primitives.compactMap({ primitive in
+      let publicPrimitives: [Primitive] = try mesh.primitives.compactMap({ primitive in
         guard let primtiveInterleavedData = try extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
           return nil
         }
 
-        return PublicPrimitive(
+        return Primitive(
           indices: primtiveInterleavedData.indices,
           vertices: primtiveInterleavedData.vertices,
           boundingBox: primtiveInterleavedData.boundingBox ?? (.zero, .zero)
         )
       })
 
-      return PublicMesh(primitives: publicPrimitives)
+      return Mesh(primitives: publicPrimitives)
     })
   }
 
