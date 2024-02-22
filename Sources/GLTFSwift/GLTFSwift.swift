@@ -7,39 +7,40 @@ struct GLTFContainer: Decodable {
   let nodes: [GLTFNode]
   let meshes: [GLTFMesh]
   let skins: [GLTFSkin]?
-  let asset: GLTFAsset
+  let asset: GLTFAssetInfo
   let buffers: [GLTFBuffer]
   let bufferViews: [GLTFBufferView]
   let accessors: [GLTFAccessor]
 }
 
-// MARK: - Asset
-struct GLTFAsset: Decodable {
+// MARK: - Asset Info
+struct GLTFAssetInfo: Decodable {
   let version: String
   let generator: String?
 }
 
 // MARK: - Scene
-struct GLTFScene: Decodable {
-  let nodes: [Int]?
+public class GLTFScene: Decodable {
+  public let nodes: [Int]?
   let name: String?
 }
 
 // MARK: - Node
-struct GLTFNode: Decodable {
-  let mesh: Int?
-  let skin: Int?
-  let children: [Int]?
-  let name: String?
-  let translation: simd_float3
-  let rotation: simd_quatf
-  let scale: simd_float3
+public class GLTFNode: Decodable {
+  public let mesh: Int?
+  public let children: [Int]?
+  public let translation: simd_float3
+  public let rotation: simd_quatf
+  public let scale: simd_float3
+
+  public let skin: Int?
+  public let name: String?
 
   enum CodingKeys: String, CodingKey {
     case mesh, skin, children, name, translation, rotation, scale, matrix
   }
 
-  init(from decoder: Decoder) throws {
+  required public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
 
     // Optional properties
@@ -126,11 +127,24 @@ struct GLTFAttributes: Decodable {
 }
 
 // MARK: - Skin
-struct GLTFSkin: Decodable {
-  let inverseBindMatrices: Int?
-  let skeleton: Int?
-  let joints: [Int]
+public struct GLTFSkin: Decodable {
+  public let inverseBindMatrices: Int?
+  public let joints: [Int]
   let name: String?
+
+  enum CodingKeys: CodingKey {
+    case inverseBindMatrices
+    case skeleton
+    case joints
+    case name
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.inverseBindMatrices = try container.decodeIfPresent(Int.self, forKey: .inverseBindMatrices)
+    self.joints = try container.decode([Int].self, forKey: .joints)
+    self.name = try container.decodeIfPresent(String.self, forKey: .name)
+  }
 }
 
 struct GLTFAccessor: Decodable {
@@ -142,7 +156,6 @@ struct GLTFAccessor: Decodable {
   let max: [Float]?
   let min: [Float]?
   let byteOffset: Int?
-
 
   var boundingBox: (min: simd_float3, max: simd_float3)? {
     guard
@@ -173,10 +186,10 @@ struct GLTFBufferView: Decodable {
   let byteOffset: Int
   let byteLength: Int
   let byteStride: Int?
-  let target: BufferViewType?
+  let target: BufferType?
 }
 
-enum BufferViewType: Int, Decodable {
+enum BufferType: Int, Decodable {
   case unknown = 0
   case vertex = 34962
   case index = 34963

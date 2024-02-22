@@ -13,6 +13,13 @@ let package = Package(
   targets: [
     .target(
       name: "GLTFSwift"
+    ),
+    .testTarget(
+      name: "GLTFSwiftTests",
+      dependencies: [
+        "GLTFSwift"
+      ],
+      resources: [.process("Resources")]
     )
   ]
 )
