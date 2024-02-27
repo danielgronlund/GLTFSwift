@@ -88,6 +88,14 @@ class GLTFLoader {
 
     let positions: [simd_float3] = try .from(data: positionsData)
 
+    let normals: [simd_float3]? = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
+      guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, in: bundle) else {
+        return nil
+      }
+
+      return try .from(data: data)
+    }
+
     let joints: [simd_uchar4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
       guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, in: bundle) else {
         return nil
@@ -116,6 +124,7 @@ class GLTFLoader {
     for (index, position) in positions.enumerated() {
       let vertex = Vertex(
         position: position,
+        normal: normals?[safe: index] ?? simd_float3(0, 0, 0),
         color: colors?[safe: index] ?? simd_float4(0, 0, 0, 1),
         joints: joints?[safe: index],
         weights: weights?[safe: index]

@@ -5,6 +5,10 @@ public struct Vertex {
   /// This is typically used to define the vertex's location within a model's geometry.
   public var position: simd_float3
 
+  /// The surface normal of the vertex, represented as a vector of three floating-point numbers.
+  /// This is typically used to calculate how light bounces of the surface.
+  public var normal: simd_float3
+
   /// The color of the vertex, represented as a vector of four floating-point numbers corresponding to
   /// the red, green, blue, and alpha (transparency) components of the color. This allows each vertex to
   /// carry its own color information, which can be used for vertex coloring techniques in rendering.
@@ -25,11 +29,13 @@ public struct Vertex {
 
   init(
     position: simd_float3,
+    normal: simd_float3,
     color: simd_float4,
     joints: simd_uchar4?,
     weights: simd_float4?
   ) {
     self.position = position
+    self.normal = normal
     self.color = color
     self.joints = joints ?? Self.invalidJointIndices
     self.weights = weights ?? .zero
