@@ -88,6 +88,14 @@ class GLTFLoader {
 
     let positions: [simd_float3] = try .from(data: positionsData)
 
+    let normals: [simd_float3]? = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
+      guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, in: bundle) else {
+        return nil
+      }
+
+      return try .from(data: data)
+    }
+
     let joints: [simd_uchar4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
       guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, in: bundle) else {
         return nil
@@ -101,7 +109,9 @@ class GLTFLoader {
         return nil
       }
 
-      return try .from(data: data)
+      // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
+      let accessor = container.accessors[colorsAccessorIndex]
+      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
 
     let weights: [simd_float4]? = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
@@ -109,13 +119,15 @@ class GLTFLoader {
         return nil
       }
 
-      return try .from(data: data)
+      let accessor = container.accessors[weightsAccessorIndex]
+      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
 
     var vertices: [Vertex] = []
     for (index, position) in positions.enumerated() {
       let vertex = Vertex(
         position: position,
+        normal: normals?[safe: index] ?? simd_float3(0, 0, 0),
         color: colors?[safe: index] ?? simd_float4(0, 0, 0, 1),
         joints: joints?[safe: index],
         weights: weights?[safe: index]
