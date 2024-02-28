@@ -109,6 +109,7 @@ class GLTFLoader {
         return nil
       }
 
+      // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
       let accessor = container.accessors[colorsAccessorIndex]
       return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
