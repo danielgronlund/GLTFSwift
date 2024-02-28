@@ -1,6 +1,17 @@
 import simd
 import Foundation
 
+public enum LoadingError: LocalizedError {
+  case unsupportedComponentType(ComponentType)
+
+  public var errorDescription: String? {
+    switch self {
+    case .unsupportedComponentType(let componentType):
+      "Unsupported component type \(componentType)"
+    }
+  }
+}
+
 extension [simd_float3] {
   static func from(data: Data) throws -> [simd_float3] {
     let componentSize = MemoryLayout<Float>.size
@@ -24,21 +35,39 @@ extension [simd_float3] {
 }
 
 extension [simd_float4] {
-  static func from(data: Data) throws -> [simd_float4] {
-    let componentSize = MemoryLayout<Float>.size
-    let strideBy = componentSize * 4
-
+  static func from(data: Data, componentType: ComponentType, normalize: Bool) throws -> [simd_float4] {
+    let actualStride = componentType.size * 4
     var result: [simd_float4] = []
 
-    data.withUnsafeBytes { rawPointer in
-      for offset in stride(from: 0, to: data.count, by: strideBy) {
-        let floatPointer = rawPointer.baseAddress!.assumingMemoryBound(to: Float.self)
-        let vec = simd_float4(
-          floatPointer[offset / componentSize],
-          floatPointer[offset / componentSize + 1],
-          floatPointer[offset / componentSize + 2],
-          floatPointer[offset / componentSize + 3]
-        )
+    try data.withUnsafeBytes { rawPointer in
+      for offset in stride(from: 0, to: data.count, by: actualStride) {
+        let baseAddress = rawPointer.baseAddress!.advanced(by: offset)
+
+        let vec: simd_float4 = try {
+          switch componentType {
+          case .float:
+            return baseAddress.assumingMemoryBound(to: Float.self).withMemoryRebound(to: simd_float4.self, capacity: 1) { $0.pointee }
+          case .unsignedByte:
+            let bytes = baseAddress.assumingMemoryBound(to: UInt8.self)
+            return simd_float4(
+              Float(bytes[0]),
+              Float(bytes[1]),
+              Float(bytes[2]),
+              Float(bytes[3])
+            ) * (normalize ? 1.0 / 255.0 : 1.0)
+          case .unsignedShort:
+            let shorts = baseAddress.assumingMemoryBound(to: UInt16.self)
+            return simd_float4(
+              Float(shorts[0]),
+              Float(shorts[1]),
+              Float(shorts[2]),
+              Float(shorts[3])
+            ) * (normalize ? 1.0 / 65535.0 : 1.0)
+          default:
+            throw LoadingError.unsupportedComponentType(componentType)
+          }
+        }()
+
         result.append(vec)
       }
     }

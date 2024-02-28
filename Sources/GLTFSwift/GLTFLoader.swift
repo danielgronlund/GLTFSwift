@@ -109,7 +109,8 @@ class GLTFLoader {
         return nil
       }
 
-      return try .from(data: data)
+      let accessor = container.accessors[colorsAccessorIndex]
+      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
 
     let weights: [simd_float4]? = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
@@ -117,7 +118,8 @@ class GLTFLoader {
         return nil
       }
 
-      return try .from(data: data)
+      let accessor = container.accessors[weightsAccessorIndex]
+      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
 
     var vertices: [Vertex] = []
