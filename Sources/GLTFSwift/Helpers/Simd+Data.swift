@@ -35,8 +35,8 @@ extension [simd_float3] {
 }
 
 extension [simd_float4] {
-  static func from(data: Data, componentType: ComponentType, normalize: Bool) throws -> [simd_float4] {
-    let actualStride = componentType.size * 4
+  static func from(data: Data, componentType: ComponentType, dataType: DataType = .vec4, normalize: Bool) throws -> [simd_float4] {
+    let actualStride = componentType.size * dataType.numberOfComponents
     var result: [simd_float4] = []
 
     try data.withUnsafeBytes { rawPointer in
@@ -46,7 +46,16 @@ extension [simd_float4] {
         let vec: simd_float4 = try {
           switch componentType {
           case .float:
-            return baseAddress.assumingMemoryBound(to: Float.self).withMemoryRebound(to: simd_float4.self, capacity: 1) { $0.pointee }
+            switch dataType {
+            case .vec3:
+              let intermediate: (x: Float, y: Float, z: Float) = baseAddress.assumingMemoryBound(to: Float.self).withMemoryRebound(to: (Float, Float, Float).self, capacity: 1) { $0.pointee }
+              // Note: This may violate the GLTF specification, since it states that colors with vec3 should assume alpha as zero.
+              return simd_float4(intermediate.x, intermediate.y, intermediate.z, 1.0)
+            case .vec4:
+              return baseAddress.assumingMemoryBound(to: Float.self).withMemoryRebound(to: simd_float4.self, capacity: 1) { $0.pointee }
+            default:
+              throw DataLoadingError.unsupportedDataType
+            }
           case .unsignedByte:
             let bytes = baseAddress.assumingMemoryBound(to: UInt8.self)
             return simd_float4(

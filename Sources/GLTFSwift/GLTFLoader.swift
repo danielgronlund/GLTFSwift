@@ -1,7 +1,12 @@
 import Foundation
 import simd
 
+enum DataLoadingError: Swift.Error {
+  case unsupportedDataType
+}
+
 class GLTFLoader {
+
   func extractData(forAccessor accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> Data? {
     guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
       return nil
@@ -111,7 +116,7 @@ class GLTFLoader {
 
       // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
       let accessor = container.accessors[colorsAccessorIndex]
-      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
+      return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
     }
 
     let weights: [simd_float4]? = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
