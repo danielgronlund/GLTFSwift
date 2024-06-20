@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 public enum ComponentType: Int, Decodable {
   case byte = 5120
