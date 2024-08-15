@@ -64,8 +64,8 @@ class GLTFLoader {
     // TODO: Clean up implementation for readiblity.
 
     return try gltfContainer.meshes.compactMap({ mesh in
-      let publicPrimitives: [Primitive] = try mesh.primitives.compactMap({ primitive in
-        guard let primtiveInterleavedData = try extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
+      let publicPrimitives: [Primitive] = try mesh.primitives.concurrentMap({ primitive in
+        guard let primtiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
           return nil
         }
 
