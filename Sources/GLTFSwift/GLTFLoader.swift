@@ -153,29 +153,49 @@ class GLTFLoader {
     let count = accessor.count
     var indices: [UInt32] = []
 
-    switch accessor.componentType {
-    case .unsignedByte:
-      for i in 0..<count {
-        let index = UInt32(binaryData[dataStart + (i * accessor.componentType.size)])
-        indices.append(index)
+    let batchSize = 1024
+    indices.reserveCapacity(count)
+    let offsetAddition = UInt32(offset)
+
+    binaryData.withUnsafeBytes { bytes in
+      switch accessor.componentType {
+      case .unsignedByte:
+        for batchStart in stride(from: 0, to: count, by: batchSize) {
+          let batchEnd = min(batchStart + batchSize, count)
+
+          for i in batchStart..<batchEnd {
+            let index = UInt32(bytes[dataStart + i])
+            indices.append(index + offsetAddition)
+          }
+        }
+
+      case .unsignedShort:
+        let pointer = bytes.baseAddress!.assumingMemoryBound(to: UInt16.self)
+        for batchStart in stride(from: 0, to: count, by: batchSize) {
+          let batchEnd = min(batchStart + batchSize, count)
+
+          for i in batchStart..<batchEnd {
+            let index = pointer[(dataStart / MemoryLayout<UInt16>.stride) + i]
+            indices.append(UInt32(index) + offsetAddition)
+          }
+        }
+
+      case .unsignedInt:
+        let pointer = bytes.baseAddress!.assumingMemoryBound(to: UInt32.self)
+        for batchStart in stride(from: 0, to: count, by: batchSize) {
+          let batchEnd = min(batchStart + batchSize, count)
+
+          for i in batchStart..<batchEnd {
+            let index = pointer[(dataStart / MemoryLayout<UInt32>.stride) + i]
+            indices.append(index + offsetAddition)
+          }
+        }
+      default:
+        fatalError("Unsupported type for indices")
       }
-    case .unsignedShort:
-      for i in 0..<count {
-        let offset = dataStart + (i * accessor.componentType.size)
-        let index = binaryData.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt16.self) }
-        indices.append(UInt32(index))
-      }
-    case .unsignedInt:
-      for i in 0..<count {
-        let offset = dataStart + (i * accessor.componentType.size)
-        let index = binaryData.withUnsafeBytes { $0.load(fromByteOffset: offset, as: UInt32.self) }
-        indices.append(index)
-      }
-    default:
-      fatalError("Unsuported type for indices")
     }
 
-    return indices.map { $0 + UInt32(offset)}
+    return indices
   }
 
   func dataForBuffer(_ buffer: GLTFBuffer, offset: Int, length: Int, in bundle: Bundle) -> Data {
