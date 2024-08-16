@@ -11,6 +11,7 @@ struct GLTFContainer: Decodable {
   let buffers: [GLTFBuffer]
   let bufferViews: [GLTFBufferView]
   let accessors: [GLTFAccessor]
+  let materials: [GLTFMaterial]?
 }
 
 // MARK: - Asset Info
@@ -108,10 +109,42 @@ struct GLTFMesh: Decodable {
   let name: String?
 }
 
+// MARK: - Material
+struct GLTFMaterial: Decodable {
+  let baseColorFactor: [Float]?
+  let metallicFactor: Float?
+  let roughnessFactor: Float?
+
+  enum CodingKeys: String, CodingKey {
+    case pbrMetallicRoughness
+  }
+
+  enum PBRMetallicRoughnessKeys: String, CodingKey {
+    case baseColorFactor
+    case metallicFactor
+    case roughnessFactor
+  }
+
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+
+    if let pbrContainer = try? container.nestedContainer(keyedBy: PBRMetallicRoughnessKeys.self, forKey: .pbrMetallicRoughness) {
+      self.baseColorFactor = try pbrContainer.decodeIfPresent([Float].self, forKey: .baseColorFactor)
+      self.metallicFactor = try pbrContainer.decodeIfPresent(Float.self, forKey: .metallicFactor)
+      self.roughnessFactor = try pbrContainer.decodeIfPresent(Float.self, forKey: .roughnessFactor)
+    } else {
+      self.baseColorFactor = nil
+      self.metallicFactor = nil
+      self.roughnessFactor = nil
+    }
+  }
+}
+
 // MARK: - Primitive
 struct GLTFPrimitive: Decodable {
   let indices: Int?
   let attributes: GLTFAttributes
+  let material: Int?
 }
 
 // MARK: - Attributes
