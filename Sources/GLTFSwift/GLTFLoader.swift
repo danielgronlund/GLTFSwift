@@ -65,14 +65,15 @@ class GLTFLoader {
 
     return try gltfContainer.meshes.compactMap({ mesh in
       let publicPrimitives: [Primitive] = try mesh.primitives.concurrentMap({ primitive in
-        guard let primtiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
+        guard let primitiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
           return nil
         }
 
         return Primitive(
-          indices: primtiveInterleavedData.indices,
-          vertices: primtiveInterleavedData.vertices,
-          boundingBox: primtiveInterleavedData.boundingBox ?? (.zero, .zero)
+          indices: primitiveInterleavedData.indices,
+          vertices: primitiveInterleavedData.vertices,
+          boundingBox: primitiveInterleavedData.boundingBox ?? (.zero, .zero), 
+          material: primitiveInterleavedData.material.map(Material.init(material:))
         )
       })
 
@@ -80,7 +81,12 @@ class GLTFLoader {
     })
   }
 
-  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, in bundle: Bundle) throws -> (vertices: [Vertex], indices: [UInt32], boundingBox: (min: simd_float3, max: simd_float3)?)? {
+  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, in bundle: Bundle) throws -> (
+    vertices: [Vertex],
+    indices: [UInt32],
+    boundingBox: (min: simd_float3, max: simd_float3)?,
+    material: GLTFMaterial?
+  )? {
     guard
       let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
       let indicesAccessorIndex = primitive.indices
@@ -128,6 +134,14 @@ class GLTFLoader {
       return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
     }
 
+    let material: GLTFMaterial? = {
+      if let accessor = primitive.material, let material = container.materials?[accessor] {
+        return material
+      } else {
+        return nil
+      }
+    }()
+
     var vertices: [Vertex] = []
     for (index, position) in positions.enumerated() {
       let vertex = Vertex(
@@ -140,7 +154,7 @@ class GLTFLoader {
       vertices.append(vertex)
     }
 
-    return (vertices: vertices, indices: indices, boundingBox: boundingBox)
+    return (vertices: vertices, indices: indices, boundingBox: boundingBox, material: material)
   }
 
   private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, in bundle: Bundle) throws -> [UInt32] {
