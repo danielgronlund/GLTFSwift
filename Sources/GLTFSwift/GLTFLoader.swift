@@ -1,21 +1,59 @@
 import Foundation
 import simd
+import DracoDecompressSwift
 
 enum DataLoadingError: Swift.Error {
   case unsupportedDataType
+  case decompressionFailure
+  case missingData
 }
 
 class GLTFLoader {
 
-  func extractData(forAccessor accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> Data? {
-    guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
+  func extractData(for primitive: GLTFPrimitive, attribute: GLTFAttribute, from container: GLTFContainer, in bundle: Bundle) throws -> (
+    positions: Data,
+    indices: Data,
+    normals: Data?,
+    colors: Data?,
+    textureCoordinates: Data?,
+    weights: Data?,
+    joints: Data?
+  )? {
+    if let dracoExtension = primitive.extensions?.dracoExtension {
+      let bufferView = container.bufferViews[dracoExtension.bufferView]
+      let buffer = container.buffers[bufferView.buffer]
+
+      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: buffer.byteLength, in: bundle)
+
+      let decodedData = try decompressDracoBuffer(compressedData)
+      return (
+        decodedData.positions,
+        decodedData.indices,
+        decodedData.normals,
+        decodedData.colors,
+        decodedData.textureCoordinates,
+        decodedData.weights,
+        decodedData.joints
+      )
+    }
+    return nil
+  }
+
+  func extractData(forAccessor accessorIndex: Int?, fromContainer container: GLTFContainer, in bundle: Bundle) -> Data? {
+    guard let accessorIndex, container.accessors.indices.contains(accessorIndex)  else {
       return nil
     }
-    let accessor = gltfContainer.accessors[accessorIndex]
-    let bufferView = gltfContainer.bufferViews[accessor.bufferView]
+
+    let accessor = container.accessors[accessorIndex]
+
+    guard let bufferViewIndex = accessor.bufferView else {
+      return nil
+    }
+
+    let bufferView = container.bufferViews[bufferViewIndex]
     let descriptor = BufferTypeDescriptor(componentType: accessor.componentType, dataType: accessor.type)
     let totalSize = descriptor.totalSize * accessor.count
-    let buffer = gltfContainer.buffers[bufferView.buffer]
+    let buffer = container.buffers[bufferView.buffer]
 
     return self.dataForBuffer(buffer, offset: bufferView.byteOffset + (accessor.byteOffset ?? 0), length: totalSize, in: bundle)
   }
@@ -87,51 +125,91 @@ class GLTFLoader {
     boundingBox: (min: simd_float3, max: simd_float3)?,
     material: GLTFMaterial?
   )? {
-    guard
-      let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
-      let indicesAccessorIndex = primitive.indices
-    else {
-      return nil
-    }
 
-    let indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, in: bundle)
-    let boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
+    let indices: [UInt32]
+    let positions: [simd_float3]
+    let boundingBox: (min: simd_float3, max: simd_float3)?
 
-    let positions: [simd_float3] = try .from(data: positionsData)
+    var normals: [simd_float3]? = nil
+    var joints: [simd_uchar4]? = nil
+    var colors: [simd_float4]? = nil
+    var weights: [simd_float4]? = nil
 
-    let normals: [simd_float3]? = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
-      guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, in: bundle) else {
-        return nil
+    if let decompressedBuffers = try extractData(for: primitive, attribute: .position, from: container, in: bundle) {
+      positions = try .from(data: decompressedBuffers.positions)
+      normals = try decompressedBuffers.normals.map {
+        try .from(data: $0)
       }
 
-      return try .from(data: data)
-    }
-
-    let joints: [simd_uchar4]? = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
-      guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, in: bundle) else {
-        return nil
+      colors = try decompressedBuffers.colors.map {
+        try .from(data: $0, componentType: .float, normalize: false)
       }
 
-      return try .from(data: data)
-    }
-
-    let colors: [simd_float4]? = try primitive.attributes.COLOR_0.flatMap { colorsAccessorIndex in
-      guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, in: bundle) else {
-        return nil
+      weights = try decompressedBuffers.weights.map {
+        try .from(data: $0, componentType: .float, normalize: false)
       }
 
-      // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
-      let accessor = container.accessors[colorsAccessorIndex]
-      return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
-    }
-
-    let weights: [simd_float4]? = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
-      guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, in: bundle) else {
-        return nil
+      // TODO: Verify that this is correct?
+      joints = try decompressedBuffers.joints.map {
+        try .from(data: $0)
       }
 
-      let accessor = container.accessors[weightsAccessorIndex]
-      return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
+      // TODO: Support texture coordinates.
+
+      let indexCount = decompressedBuffers.indices.count / MemoryLayout<UInt32>.size
+      let mappedIndices = decompressedBuffers.indices.withUnsafeBytes { buffer in
+        Array(UnsafeBufferPointer<UInt32>(start: buffer.bindMemory(to: UInt32.self).baseAddress!, count: indexCount))
+      }
+
+      indices = mappedIndices
+
+      boundingBox = nil
+    } else {
+      guard
+        let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
+        let indicesAccessorIndex = primitive.indices
+      else {
+        throw DataLoadingError.missingData
+      }
+
+      indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, in: bundle)
+      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
+      positions = try .from(data: positionsData)
+
+      normals = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
+        guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, in: bundle) else {
+          return nil
+        }
+
+        return try .from(data: data)
+      }
+
+      joints = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
+        guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, in: bundle) else {
+          return nil
+        }
+
+        return try .from(data: data)
+      }
+
+      colors = try primitive.attributes.COLOR_0.flatMap { colorsAccessorIndex in
+        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, in: bundle) else {
+          return nil
+        }
+
+        // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
+        let accessor = container.accessors[colorsAccessorIndex]
+        return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
+      }
+
+      colors = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
+        guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, in: bundle) else {
+          return nil
+        }
+
+        let accessor = container.accessors[weightsAccessorIndex]
+        return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
+      }
     }
 
     let material: GLTFMaterial? = {
@@ -159,7 +237,11 @@ class GLTFLoader {
 
   private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, in bundle: Bundle) throws -> [UInt32] {
     let accessor = gltfContainer.accessors[accessorIndex]
-    let bufferView = gltfContainer.bufferViews[accessor.bufferView]
+    guard let bufferViewIndex = accessor.bufferView else {
+      return []
+    }
+
+    let bufferView = gltfContainer.bufferViews[bufferViewIndex]
     let buffer = gltfContainer.buffers[bufferView.buffer]
     let binaryData = try FileReader.readFile(buffer.uri, in: bundle)
 
