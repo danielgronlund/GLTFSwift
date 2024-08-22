@@ -8,16 +8,21 @@ let package = Package(
     .library(
       name: "GLTFSwift",
       targets: ["GLTFSwift"]
-    )
+    ),
+  ],
+  dependencies: [
+    .package(url: "git@github.com:danielgronlund/decompress-draco-swift.git", exact: Version(0, 0, 4))
   ],
   targets: [
     .target(
-      name: "GLTFSwift"
+      name: "GLTFSwift",
+      dependencies: [
+        .product(name: "DracoDecompressSwift", package: "decompress-draco-swift")]
     ),
     .testTarget(
       name: "GLTFSwiftTests",
       dependencies: [
-        "GLTFSwift"
+        "GLTFSwift",
       ],
       resources: [.process("Resources")]
     )

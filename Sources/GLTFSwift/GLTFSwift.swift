@@ -140,14 +140,49 @@ struct GLTFMaterial: Decodable {
   }
 }
 
+struct DracoExtension: Decodable {
+  let bufferView: Int
+  let attributes: GLTFAttributes
+
+  enum CodingKeys: CodingKey {
+    case bufferView
+    case attributes
+  }
+
+  init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.bufferView = try container.decode(Int.self, forKey: .bufferView)
+    self.attributes = try container.decode(GLTFAttributes.self, forKey: .attributes)
+  }
+}
+
 // MARK: - Primitive
 struct GLTFPrimitive: Decodable {
   let indices: Int?
   let attributes: GLTFAttributes
   let material: Int?
+  let extensions: PrimitiveExtensions?
+}
+
+struct PrimitiveExtensions: Decodable {
+  let dracoExtension: DracoExtension
+  enum CodingKeys: String, CodingKey {
+    case dracoExtension = "KHR_draco_mesh_compression"
+  }
 }
 
 // MARK: - Attributes
+enum GLTFAttribute {
+  case position
+  case normal
+  case tangent
+  case texCoord0
+  case texCoord1
+  case color0
+  case joints0
+  case weights0
+}
+
 struct GLTFAttributes: Decodable {
   let POSITION: Int?
   let NORMAL: Int?
@@ -157,6 +192,27 @@ struct GLTFAttributes: Decodable {
   let COLOR_0: Int?
   let JOINTS_0: Int?
   let WEIGHTS_0: Int?
+
+  func accessorIndex(for attribute: GLTFAttribute) -> Int? {
+    switch attribute {
+    case .position:
+      self.POSITION
+    case .normal:
+      self.NORMAL
+    case .tangent:
+      self.TANGENT
+    case .texCoord0:
+      self.TEXCOORD_0
+    case .texCoord1:
+      self.TEXCOORD_1
+    case .color0:
+      self.COLOR_0
+    case .joints0:
+      self.JOINTS_0
+    case .weights0:
+      self.WEIGHTS_0
+    }
+  }
 }
 
 // MARK: - Skin
@@ -181,7 +237,7 @@ public struct GLTFSkin: Decodable {
 }
 
 struct GLTFAccessor: Decodable {
-  let bufferView: Int
+  let bufferView: Int?
   let componentType: ComponentType
   let normalized: Bool?
   let count: Int
