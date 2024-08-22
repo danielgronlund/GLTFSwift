@@ -18,4 +18,8 @@ final class FileLoadingTests: XCTestCase {
   func testLoadFileWithJoints() throws {
     _ = try loader.loadContainer(path: "simple-cube-joints.gltf", in: .module)
   }
+
+  func testLoadCompressedModel() throws {
+    _ = try loader.loadContainer(path: "draco-compressed.gltf", in: .module)
+  }
 }

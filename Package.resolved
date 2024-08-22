@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "decompress-draco-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:danielgronlund/decompress-draco-swift.git",
+      "state" : {
+        "revision" : "2287e467dbc7a4ea3c4bdd1daf96fa226454e5bd",
+        "version" : "0.0.4"
+      }
+    },
+    {
+      "identity" : "dracoswift",
+      "kind" : "remoteSourceControl",
+      "location" : "git@github.com:danielgronlund/DracoSwift.git",
+      "state" : {
+        "revision" : "3f85e64b4e62b070871dfdc1e26c058aaa1de63e",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 2
+}
