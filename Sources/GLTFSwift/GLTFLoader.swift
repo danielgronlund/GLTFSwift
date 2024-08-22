@@ -202,7 +202,7 @@ class GLTFLoader {
         return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
       }
 
-      colors = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
+      weights = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
         guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, in: bundle) else {
           return nil
         }
