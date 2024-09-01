@@ -23,7 +23,7 @@ class GLTFLoader {
       let bufferView = container.bufferViews[dracoExtension.bufferView]
       let buffer = container.buffers[bufferView.buffer]
 
-      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: buffer.byteLength, in: bundle)
+      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: bufferView.byteLength, in: bundle)
 
       let decodedData = try decompressDracoBuffer(compressedData)
       return (
