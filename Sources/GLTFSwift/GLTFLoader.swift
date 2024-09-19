@@ -142,7 +142,7 @@ class GLTFLoader {
       }
 
       colors = try decompressedBuffers.colors.map {
-        try .from(data: $0, componentType: .float, normalize: false)
+        try .from(data: $0, componentType: .float, dataType: .vec3, normalize: false)
       }
 
       weights = try decompressedBuffers.weights.map {
