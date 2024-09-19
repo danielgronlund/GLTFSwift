@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 public struct Material {
-  public let baseColor: simd_float4
+  public let baseColor: simd_float4?
   public let metallicFactor: Float
   public let roughnessFactor: Float
 
@@ -13,7 +13,7 @@ public struct Material {
   }
 
   init(material: GLTFMaterial) {
-    self.baseColor = .init(material.baseColorFactor ?? [1,1,1,1])
+    self.baseColor = material.baseColorFactor.map(simd_float4.init)
     self.metallicFactor = material.metallicFactor ?? 1.0
     self.roughnessFactor = material.roughnessFactor ?? 1.0
   }
