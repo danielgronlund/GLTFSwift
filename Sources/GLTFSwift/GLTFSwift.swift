@@ -111,12 +111,16 @@ struct GLTFMesh: Decodable {
 
 // MARK: - Material
 struct GLTFMaterial: Decodable {
+  let name: String?
+  let doubleSided: Bool?
   let baseColorFactor: [Float]?
   let metallicFactor: Float?
   let roughnessFactor: Float?
 
   enum CodingKeys: String, CodingKey {
     case pbrMetallicRoughness
+    case name
+    case doubleSided
   }
 
   enum PBRMetallicRoughnessKeys: String, CodingKey {
@@ -137,6 +141,9 @@ struct GLTFMaterial: Decodable {
       self.metallicFactor = nil
       self.roughnessFactor = nil
     }
+
+    self.name = try container.decodeIfPresent(String.self, forKey: .name)
+    self.doubleSided = try container.decodeIfPresent(Bool.self, forKey: .doubleSided)
   }
 }
 
