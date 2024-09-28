@@ -163,7 +163,7 @@ class GLTFLoader {
 
       indices = mappedIndices
 
-      boundingBox = nil
+      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
     } else {
       guard
         let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
