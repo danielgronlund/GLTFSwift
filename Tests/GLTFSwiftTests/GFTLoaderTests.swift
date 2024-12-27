@@ -22,4 +22,14 @@ final class FileLoadingTests: XCTestCase {
   func testLoadCompressedModel() throws {
     _ = try loader.loadContainer(path: "draco-compressed.gltf", in: .module)
   }
+
+  func testLoadUV() throws {
+    _ = try loader.loadContainer(path: "uv_cube.gltf", in: .module)
+    // TODO: Verify UV Coordinates
+  }
+
+  func testLoadUVCompressed() throws {
+    _ = try loader.loadContainer(path: "uv_cube_compressed.gltf", in: .module)
+    // TODO: Verify UV Coordinates
+  }
 }
