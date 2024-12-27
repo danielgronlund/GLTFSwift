@@ -133,6 +133,8 @@ class GLTFLoader {
     var normals: [simd_float3]? = nil
     var joints: [simd_uchar4]? = nil
     var colors: [simd_float4]? = nil
+    var textureCoordinates: [simd_float2]? = nil
+
     var weights: [simd_float4]? = nil
 
     if let decompressedBuffers = try extractData(for: primitive, attribute: .position, from: container, in: bundle) {
@@ -143,6 +145,10 @@ class GLTFLoader {
 
       colors = try decompressedBuffers.colors.map {
         try .from(data: $0, componentType: .float, dataType: .vec3, normalize: false)
+      }
+
+      textureCoordinates = try decompressedBuffers.textureCoordinates.map {
+        try .from(data: $0, componentType: .float, normalize: false)
       }
 
       weights = try decompressedBuffers.weights.map {
@@ -202,6 +208,16 @@ class GLTFLoader {
         return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
       }
 
+      textureCoordinates = try primitive.attributes.TEXCOORD_0.flatMap { colorsAccessorIndex in
+        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, in: bundle) else {
+          return nil
+        }
+
+        // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
+        let accessor = container.accessors[colorsAccessorIndex]
+        return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
+      }
+
       weights = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
         guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, in: bundle) else {
           return nil
@@ -226,6 +242,7 @@ class GLTFLoader {
         position: position,
         normal: normals?[safe: index] ?? simd_float3(0, 0, 0),
         color: colors?[safe: index] ?? simd_float4(0, 0, 0, 1),
+        uv: textureCoordinates?[safe: index] ?? .zero,
         joints: joints?[safe: index],
         weights: weights?[safe: index]
       )

@@ -34,6 +34,49 @@ extension [simd_float3] {
   }
 }
 
+extension [simd_float2] {
+  static func from(data: Data, componentType: ComponentType, dataType: DataType = .vec2, normalize: Bool) throws -> [simd_float2] {
+    let actualStride = componentType.size * dataType.numberOfComponents
+    var result: [simd_float2] = []
+
+    try data.withUnsafeBytes { rawPointer in
+      for offset in stride(from: 0, to: data.count, by: actualStride) {
+        let baseAddress = rawPointer.baseAddress!.advanced(by: offset)
+
+        let vec: simd_float2 = try {
+          switch componentType {
+          case .float:
+            switch dataType {
+            case .vec2:
+              return baseAddress.assumingMemoryBound(to: Float.self).withMemoryRebound(to: simd_float2.self, capacity: 1) { $0.pointee }
+            default:
+              throw DataLoadingError.unsupportedDataType
+            }
+          case .unsignedByte:
+            let bytes = baseAddress.assumingMemoryBound(to: UInt8.self)
+            return simd_float2(
+              Float(bytes[0]),
+              Float(bytes[1])
+            ) * (normalize ? 1.0 / 255.0 : 1.0)
+          case .unsignedShort:
+            let shorts = baseAddress.assumingMemoryBound(to: UInt16.self)
+            return simd_float2(
+              Float(shorts[0]),
+              Float(shorts[1])
+            ) * (normalize ? 1.0 / 65535.0 : 1.0)
+          default:
+            throw LoadingError.unsupportedComponentType(componentType)
+          }
+        }()
+
+        result.append(vec)
+      }
+    }
+
+    return result
+  }
+}
+
 extension [simd_float4] {
   static func from(data: Data, componentType: ComponentType, dataType: DataType = .vec4, normalize: Bool) throws -> [simd_float4] {
     let actualStride = componentType.size * dataType.numberOfComponents

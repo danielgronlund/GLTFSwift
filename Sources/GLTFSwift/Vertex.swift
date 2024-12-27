@@ -14,6 +14,10 @@ public struct Vertex {
   /// carry its own color information, which can be used for vertex coloring techniques in rendering.
   public var color: simd_float4
 
+  /// Coordinates for texture mapping to the vertex.
+  /// UV coordinates are typically within the range 0.0 to 1.0.
+  public var uv: simd_float2
+
   /// The indices of the joints that influence this vertex, represented as a four-component vector. Each component is an
   /// index into the array of joints in the skeleton. For vertices not influenced by any joint, this can be set to a
   /// default value (e.g., 255). This is used for skeletal animation, where the joints' movements influence the mesh's vertices.
@@ -31,12 +35,14 @@ public struct Vertex {
     position: simd_float3,
     normal: simd_float3,
     color: simd_float4,
+    uv: simd_float2,
     joints: simd_uchar4?,
     weights: simd_float4?
   ) {
     self.position = position
     self.normal = normal
     self.color = color
+    self.uv = uv
     self.joints = joints ?? Self.invalidJointIndices
     self.weights = weights ?? .zero
   }
