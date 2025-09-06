@@ -10,7 +10,7 @@ enum DataLoadingError: Swift.Error {
 
 class GLTFLoader {
 
-  func extractData(for primitive: GLTFPrimitive, attribute: GLTFAttribute, from container: GLTFContainer, in bundle: Bundle) throws -> (
+  func extractData(for primitive: GLTFPrimitive, attribute: GLTFAttribute, from container: GLTFContainer, from filepath: URL) throws -> (
     positions: Data,
     indices: Data,
     normals: Data?,
@@ -23,7 +23,7 @@ class GLTFLoader {
       let bufferView = container.bufferViews[dracoExtension.bufferView]
       let buffer = container.buffers[bufferView.buffer]
 
-      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: bufferView.byteLength, in: bundle)
+      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: bufferView.byteLength, from: filepath)
 
       let decodedData = try decompressDracoBuffer(compressedData)
       return (
@@ -39,7 +39,7 @@ class GLTFLoader {
     return nil
   }
 
-  func extractData(forAccessor accessorIndex: Int?, fromContainer container: GLTFContainer, in bundle: Bundle) -> Data? {
+  func extractData(forAccessor accessorIndex: Int?, fromContainer container: GLTFContainer, from filepath: URL) -> Data? {
     guard let accessorIndex, container.accessors.indices.contains(accessorIndex)  else {
       return nil
     }
@@ -55,10 +55,10 @@ class GLTFLoader {
     let totalSize = descriptor.totalSize * accessor.count
     let buffer = container.buffers[bufferView.buffer]
 
-    return self.dataForBuffer(buffer, offset: bufferView.byteOffset + (accessor.byteOffset ?? 0), length: totalSize, in: bundle)
+    return self.dataForBuffer(buffer, offset: bufferView.byteOffset + (accessor.byteOffset ?? 0), length: totalSize, from: filepath)
   }
 
-  func extractBoundingBox(for accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer, in bundle: Bundle) -> (min: simd_float3, max: simd_float3)? {
+  func extractBoundingBox(for accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer) -> (min: simd_float3, max: simd_float3)? {
     guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
       return nil
     }
@@ -72,23 +72,21 @@ class GLTFLoader {
     return (min, max)
   }
 
-  func loadContainer(path: String, in bundle: Bundle) throws -> GLTFAsset {
-    let gltfContainer = try load(file: path, in: bundle)
+  func loadContainer(from filepath: URL) throws -> GLTFAsset {
+    let gltfContainer = try load(file: filepath)
 
     return GLTFAsset(
       scenes: gltfContainer.scenes,
       nodes: gltfContainer.nodes,
-      meshes: try mapMeshes(of: gltfContainer, in: bundle),
-      skins: try mapSkins(of: gltfContainer, in: bundle),
+      meshes: try mapMeshes(of: gltfContainer, from: filepath),
+      skins: try mapSkins(of: gltfContainer, from: filepath),
       accessors: gltfContainer.accessors
     )
   }
 
-  func mapSkins(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [Skin] {
-    // TODO: Clean up implementation for readiblity.
-
+  func mapSkins(of gltfContainer: GLTFContainer, from filepath: URL) throws -> [Skin] {
     return try gltfContainer.skins?.compactMap { skin in
-      guard let data = extractData(forAccessor: skin.inverseBindMatrices, fromContainer: gltfContainer, in: bundle) else {
+      guard let data = extractData(forAccessor: skin.inverseBindMatrices, fromContainer: gltfContainer, from: filepath) else {
         return nil
       }
 
@@ -98,19 +96,17 @@ class GLTFLoader {
     } ?? []
   }
 
-  func mapMeshes(of gltfContainer: GLTFContainer, in bundle: Bundle) throws -> [Mesh] {
-    // TODO: Clean up implementation for readiblity.
-
+  func mapMeshes(of gltfContainer: GLTFContainer, from filepath: URL) throws -> [Mesh] {
     return try gltfContainer.meshes.compactMap({ mesh in
       let publicPrimitives: [Primitive] = try mesh.primitives.concurrentMap({ primitive in
-        guard let primitiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, in: bundle) else {
+        guard let primitiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, from: filepath) else {
           return nil
         }
 
         return Primitive(
           indices: primitiveInterleavedData.indices,
           vertices: primitiveInterleavedData.vertices,
-          boundingBox: primitiveInterleavedData.boundingBox ?? (.zero, .zero), 
+          boundingBox: primitiveInterleavedData.boundingBox ?? (.zero, .zero),
           material: primitiveInterleavedData.material.map(Material.init(material:))
         )
       })
@@ -119,7 +115,7 @@ class GLTFLoader {
     })
   }
 
-  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, in bundle: Bundle) throws -> (
+  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, from filepath: URL) throws -> (
     vertices: [Vertex],
     indices: [UInt32],
     boundingBox: (min: simd_float3, max: simd_float3)?,
@@ -137,7 +133,7 @@ class GLTFLoader {
 
     var weights: [simd_float4]? = nil
 
-    if let decompressedBuffers = try extractData(for: primitive, attribute: .position, from: container, in: bundle) {
+    if let decompressedBuffers = try extractData(for: primitive, attribute: .position, from: container, from: filepath) {
       positions = try .from(data: decompressedBuffers.positions)
       normals = try decompressedBuffers.normals.map {
         try .from(data: $0)
@@ -169,21 +165,21 @@ class GLTFLoader {
 
       indices = mappedIndices
 
-      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
+      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container)
     } else {
       guard
-        let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, in: bundle),
+        let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, from: filepath),
         let indicesAccessorIndex = primitive.indices
       else {
         throw DataLoadingError.missingData
       }
 
-      indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, in: bundle)
-      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container, in: bundle)
+      indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, from: filepath)
+      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container)
       positions = try .from(data: positionsData)
 
       normals = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
-        guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, in: bundle) else {
+        guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, from: filepath) else {
           return nil
         }
 
@@ -191,7 +187,7 @@ class GLTFLoader {
       }
 
       joints = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
-        guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, in: bundle) else {
+        guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, from: filepath) else {
           return nil
         }
 
@@ -199,7 +195,7 @@ class GLTFLoader {
       }
 
       colors = try primitive.attributes.COLOR_0.flatMap { colorsAccessorIndex in
-        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, in: bundle) else {
+        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, from: filepath) else {
           return nil
         }
 
@@ -209,7 +205,7 @@ class GLTFLoader {
       }
 
       textureCoordinates = try primitive.attributes.TEXCOORD_0.flatMap { colorsAccessorIndex in
-        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, in: bundle) else {
+        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, from: filepath) else {
           return nil
         }
 
@@ -219,7 +215,7 @@ class GLTFLoader {
       }
 
       weights = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
-        guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, in: bundle) else {
+        guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, from: filepath) else {
           return nil
         }
 
@@ -252,7 +248,15 @@ class GLTFLoader {
     return (vertices: vertices, indices: indices, boundingBox: boundingBox, material: material)
   }
 
-  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, in bundle: Bundle) throws -> [UInt32] {
+  private func load(file filepath: URL) throws -> GLTFContainer {
+    let jsonData = try FileReader.readFile(at: filepath)
+    let decoder = JSONDecoder()
+    let gltfContainer = try decoder.decode(GLTFContainer.self, from: jsonData)
+
+    return gltfContainer
+  }
+
+  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, from filepath: URL) throws -> [UInt32] {
     let accessor = gltfContainer.accessors[accessorIndex]
     guard let bufferViewIndex = accessor.bufferView else {
       return []
@@ -260,7 +264,9 @@ class GLTFLoader {
 
     let bufferView = gltfContainer.bufferViews[bufferViewIndex]
     let buffer = gltfContainer.buffers[bufferView.buffer]
-    let binaryData = try FileReader.readFile(buffer.uri, in: bundle)
+    let gltfDirectory = filepath.deletingLastPathComponent()
+    let bufferURL = gltfDirectory.appendingPathComponent(buffer.uri ?? "")
+    let binaryData = try Data(contentsOf: bufferURL)
 
     let dataStart = bufferView.byteOffset
     let count = accessor.count
@@ -311,9 +317,11 @@ class GLTFLoader {
     return indices
   }
 
-  func dataForBuffer(_ buffer: GLTFBuffer, offset: Int, length: Int, in bundle: Bundle) -> Data {
+  func dataForBuffer(_ buffer: GLTFBuffer, offset: Int, length: Int, from filepath: URL) -> Data {
     do {
-      let fileData = try FileReader.readFile(buffer.uri, in: bundle)
+      let gltfDirectory = filepath.deletingLastPathComponent()
+      let bufferURL = gltfDirectory.appendingPathComponent(buffer.uri ?? "")
+      let fileData = try Data(contentsOf: bufferURL)
       guard offset + length <= fileData.count else {
         print("Requested data range exceeds file size.")
         return Data()
@@ -323,13 +331,5 @@ class GLTFLoader {
       print("Failed to read buffer data: \(error.localizedDescription)")
       return Data()
     }
-  }
-
-  private func load(file gltfFile: String, in bundle: Bundle) throws -> GLTFContainer {
-    let jsonData = try FileReader.readFile(gltfFile, in: bundle)
-    let decoder = JSONDecoder()
-    let gltfContainer = try decoder.decode(GLTFContainer.self, from: jsonData)
-
-    return gltfContainer
   }
 }

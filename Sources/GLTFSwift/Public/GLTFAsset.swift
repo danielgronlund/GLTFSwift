@@ -59,6 +59,13 @@ public class GLTFAsset {
 }
 
 public func load(_ filename: String, in bundle: Bundle = .main) throws -> GLTFAsset {
+  guard let filepath = bundle.path(forResource: filename, ofType: nil) else {
+    throw FileReader.Error.fileNotFound(filename)
+  }
+  return try load(from: URL(fileURLWithPath: filepath))
+}
+
+public func load(from filepath: URL) throws -> GLTFAsset {
   let loader = GLTFLoader()
-  return try loader.loadContainer(path: filename, in: bundle)
+  return try loader.loadContainer(from: filepath)
 }

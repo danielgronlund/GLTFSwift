@@ -15,16 +15,8 @@ struct FileReader {
     }
   }
 
-  static func readFile(_ filename: String?, in bundle: Bundle) throws -> Data {
-    guard let filename else {
-      throw Error.emptyFilename
-    }
-
-    guard let path = bundle.path(forResource: filename, ofType: nil) else {
-      throw Error.fileNotFound(filename)
-    }
-
-    let url = URL(fileURLWithPath: path)
+  static func readFile(at filepath: URL) throws -> Data {
+    let url = filepath
     return try Data(contentsOf: url)
   }
 }
