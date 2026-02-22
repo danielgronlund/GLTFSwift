@@ -107,7 +107,9 @@ class GLTFLoader {
           indices: primitiveInterleavedData.indices,
           vertices: primitiveInterleavedData.vertices,
           boundingBox: primitiveInterleavedData.boundingBox ?? (.zero, .zero),
-          material: primitiveInterleavedData.material.map(Material.init(material:))
+          material: primitiveInterleavedData.material.map {
+            Material(material: $0, in: gltfContainer, relativeTo: filepath)
+          }
         )
       })
 
@@ -237,7 +239,7 @@ class GLTFLoader {
       let vertex = Vertex(
         position: position,
         normal: normals?[safe: index] ?? simd_float3(0, 0, 0),
-        color: colors?[safe: index] ?? simd_float4(0, 0, 0, 1),
+        color: colors?[safe: index] ?? simd_float4(1, 1, 1, 1),
         uv: textureCoordinates?[safe: index] ?? .zero,
         joints: joints?[safe: index],
         weights: weights?[safe: index]

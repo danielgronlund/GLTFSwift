@@ -1,21 +1,73 @@
 import Foundation
 import simd
 
+public struct Texture {
+  public let uri: String?
+  public let mimeType: String?
+  public let data: Data?
+}
+
 public struct Material {
   public let baseColor: simd_float4?
+  public let baseColorTexture: Texture?
   public let metallicFactor: Float
   public let roughnessFactor: Float
 
-  public init(baseColor: simd_float4, metallicFactor: Float, roughnessFactor: Float) {
+  public init(
+    baseColor: simd_float4,
+    baseColorTexture: Texture? = nil,
+    metallicFactor: Float,
+    roughnessFactor: Float
+  ) {
+
     self.baseColor = baseColor
+    self.baseColorTexture = baseColorTexture
     self.metallicFactor = metallicFactor
     self.roughnessFactor = roughnessFactor
   }
 
-  init(material: GLTFMaterial) {
+  init(
+    material: GLTFMaterial,
+    in container: GLTFContainer,
+    relativeTo filepath: URL
+  ) {
+
     self.baseColor = material.baseColorFactor.map(simd_float4.init)
+    self.baseColorTexture = Self.resolveBaseColorTexture(
+      for: material,
+      in: container,
+      relativeTo: filepath
+    )
     self.metallicFactor = material.metallicFactor ?? 1.0
     self.roughnessFactor = material.roughnessFactor ?? 1.0
+  }
+
+  private static func resolveBaseColorTexture(
+    for material: GLTFMaterial,
+    in container: GLTFContainer,
+    relativeTo filepath: URL
+  ) -> Texture? {
+
+    guard
+      let textureIndex = material.baseColorTexture?.index,
+      let texture = container.textures?[safe: textureIndex],
+      let imageSourceIndex = texture.source,
+      let image = container.images?[safe: imageSourceIndex]
+    else {
+      return nil
+    }
+
+    let imageData: Data? = {
+      guard let uri = image.uri else {
+        return nil
+      }
+
+      let gltfDirectory = filepath.deletingLastPathComponent()
+      let imageURL = gltfDirectory.appendingPathComponent(uri)
+      return try? Data(contentsOf: imageURL)
+    }()
+
+    return Texture(uri: image.uri, mimeType: image.mimeType, data: imageData)
   }
 }
 

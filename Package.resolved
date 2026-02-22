@@ -3,7 +3,7 @@
     {
       "identity" : "decompress-draco-swift",
       "kind" : "remoteSourceControl",
-      "location" : "git@github.com:danielgronlund/decompress-draco-swift.git",
+      "location" : "https://github.com/danielgronlund/decompress-draco-swift.git",
       "state" : {
         "branch" : "0.0.7",
         "revision" : "4753507c1e10be61cddd56c357d8fd0e886fc0ef"
