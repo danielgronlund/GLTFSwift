@@ -40,6 +40,32 @@ final class FileLoadingTests: XCTestCase {
     // TODO: Verify UV Coordinates
   }
 
+  func testLoadMaterialTexture() throws {
+    let url = try given(resource: "gold-box.gltf", in: .module)
+    let asset = try loader.loadContainer(from: url)
+
+    let primitive = try XCTUnwrap(asset.meshes.first?.primitives.first)
+    let material = try XCTUnwrap(primitive.material)
+    let baseColorTexture = try XCTUnwrap(material.baseColorTexture)
+
+    XCTAssertEqual(baseColorTexture.uri, "Material_001_baseColor.png")
+    XCTAssertEqual(baseColorTexture.mimeType, "image/png")
+    XCTAssertFalse((baseColorTexture.data ?? Data()).isEmpty)
+  }
+
+  func testDefaultVertexColorIsWhiteWhenColorAttributeIsMissing() throws {
+    let url = try given(resource: "gold-box.gltf", in: .module)
+    let asset = try loader.loadContainer(from: url)
+
+    let primitive = try XCTUnwrap(asset.meshes.first?.primitives.first)
+    let firstColor = try XCTUnwrap(primitive.vertices.first?.color)
+
+    XCTAssertEqual(firstColor.x, 1, accuracy: 0.0001)
+    XCTAssertEqual(firstColor.y, 1, accuracy: 0.0001)
+    XCTAssertEqual(firstColor.z, 1, accuracy: 0.0001)
+    XCTAssertEqual(firstColor.w, 1, accuracy: 0.0001)
+  }
+
   func given(resource: String, in bundle: Bundle, file: StaticString = #file, line: UInt =  #line) throws -> URL {
     let url = bundle.url(forResource: resource, withExtension: nil)
     return try given(url: url, file: file, line: line)

@@ -12,6 +12,9 @@ struct GLTFContainer: Decodable {
   let bufferViews: [GLTFBufferView]
   let accessors: [GLTFAccessor]
   let materials: [GLTFMaterial]?
+  let textures: [GLTFTexture]?
+  let images: [GLTFImage]?
+  let samplers: [GLTFSampler]?
 }
 
 // MARK: - Asset Info
@@ -114,6 +117,7 @@ struct GLTFMaterial: Decodable {
   let name: String?
   let doubleSided: Bool?
   let baseColorFactor: [Float]?
+  let baseColorTexture: GLTFTextureInfo?
   let metallicFactor: Float?
   let roughnessFactor: Float?
 
@@ -125,6 +129,7 @@ struct GLTFMaterial: Decodable {
 
   enum PBRMetallicRoughnessKeys: String, CodingKey {
     case baseColorFactor
+    case baseColorTexture
     case metallicFactor
     case roughnessFactor
   }
@@ -134,10 +139,12 @@ struct GLTFMaterial: Decodable {
 
     if let pbrContainer = try? container.nestedContainer(keyedBy: PBRMetallicRoughnessKeys.self, forKey: .pbrMetallicRoughness) {
       self.baseColorFactor = try pbrContainer.decodeIfPresent([Float].self, forKey: .baseColorFactor)
+      self.baseColorTexture = try pbrContainer.decodeIfPresent(GLTFTextureInfo.self, forKey: .baseColorTexture)
       self.metallicFactor = try pbrContainer.decodeIfPresent(Float.self, forKey: .metallicFactor)
       self.roughnessFactor = try pbrContainer.decodeIfPresent(Float.self, forKey: .roughnessFactor)
     } else {
       self.baseColorFactor = nil
+      self.baseColorTexture = nil
       self.metallicFactor = nil
       self.roughnessFactor = nil
     }
@@ -145,6 +152,28 @@ struct GLTFMaterial: Decodable {
     self.name = try container.decodeIfPresent(String.self, forKey: .name)
     self.doubleSided = try container.decodeIfPresent(Bool.self, forKey: .doubleSided)
   }
+}
+
+struct GLTFTextureInfo: Decodable {
+  let index: Int
+}
+
+struct GLTFTexture: Decodable {
+  let sampler: Int?
+  let source: Int?
+}
+
+struct GLTFImage: Decodable {
+  let mimeType: String?
+  let name: String?
+  let uri: String?
+}
+
+struct GLTFSampler: Decodable {
+  let magFilter: Int?
+  let minFilter: Int?
+  let wrapS: Int?
+  let wrapT: Int?
 }
 
 struct DracoExtension: Decodable {
