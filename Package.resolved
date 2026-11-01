@@ -17,6 +17,15 @@
         "branch" : "spm-0.0.1",
         "revision" : "a16d61bd471e8132501f82d712a8ae88167023b1"
       }
+    },
+    {
+      "identity" : "meshoptimizer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/danielgronlund/meshoptimizer.git",
+      "state" : {
+        "branch" : "swift-package-manager",
+        "revision" : "98c869c0292c395d45da8d36b875e084a027fd07"
+      }
     }
   ],
   "version" : 2
