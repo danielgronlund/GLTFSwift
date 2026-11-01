@@ -1,6 +1,6 @@
+import DracoDecompressSwift
 import Foundation
 import simd
-import DracoDecompressSwift
 
 enum DataLoadingError: Swift.Error {
   case unsupportedDataType
@@ -9,329 +9,249 @@ enum DataLoadingError: Swift.Error {
 }
 
 class GLTFLoader {
-
-  func extractData(for primitive: GLTFPrimitive, attribute: GLTFAttribute, from container: GLTFContainer, from filepath: URL) throws -> (
-    positions: Data,
-    indices: Data,
-    normals: Data?,
-    colors: Data?,
-    textureCoordinates: Data?,
-    weights: Data?,
-    joints: Data?
-  )? {
-    if let dracoExtension = primitive.extensions?.dracoExtension {
-      let bufferView = container.bufferViews[dracoExtension.bufferView]
-      let buffer = container.buffers[bufferView.buffer]
-
-      let compressedData = self.dataForBuffer(buffer, offset: bufferView.byteOffset, length: bufferView.byteLength, from: filepath)
-
-      let decodedData = try decompressDracoBuffer(compressedData)
-      return (
-        decodedData.positions,
-        decodedData.indices,
-        decodedData.normals,
-        decodedData.colors,
-        decodedData.textureCoordinates,
-        decodedData.weights,
-        decodedData.joints
-      )
-    }
-    return nil
-  }
-
-  func extractData(forAccessor accessorIndex: Int?, fromContainer container: GLTFContainer, from filepath: URL) -> Data? {
-    guard let accessorIndex, container.accessors.indices.contains(accessorIndex)  else {
-      return nil
-    }
-
-    let accessor = container.accessors[accessorIndex]
-
-    guard let bufferViewIndex = accessor.bufferView else {
-      return nil
-    }
-
-    let bufferView = container.bufferViews[bufferViewIndex]
-    let descriptor = BufferTypeDescriptor(componentType: accessor.componentType, dataType: accessor.type)
-    let totalSize = descriptor.totalSize * accessor.count
-    let buffer = container.buffers[bufferView.buffer]
-
-    return self.dataForBuffer(buffer, offset: bufferView.byteOffset + (accessor.byteOffset ?? 0), length: totalSize, from: filepath)
-  }
-
-  func extractBoundingBox(for accessorIndex: Int?, fromContainer gltfContainer: GLTFContainer) -> (min: simd_float3, max: simd_float3)? {
-    guard let accessorIndex, gltfContainer.accessors.indices.contains(accessorIndex) else {
-      return nil
-    }
-
-    let accessor = gltfContainer.accessors[accessorIndex]
-
-    guard let min = accessor.min.flatMap(simd_float3.init), let max = accessor.max.flatMap(simd_float3.init) else {
-      return nil
-    }
-
-    return (min, max)
-  }
-
   func loadContainer(from filepath: URL) throws -> GLTFAsset {
-    let gltfContainer = try load(file: filepath)
-
-    return GLTFAsset(
-      scenes: gltfContainer.scenes,
-      nodes: gltfContainer.nodes,
-      meshes: try mapMeshes(of: gltfContainer, from: filepath),
-      skins: try mapSkins(of: gltfContainer, from: filepath),
-      accessors: gltfContainer.accessors
-    )
-  }
-
-  func mapSkins(of gltfContainer: GLTFContainer, from filepath: URL) throws -> [Skin] {
-    return try gltfContainer.skins?.compactMap { skin in
-      guard let data = extractData(forAccessor: skin.inverseBindMatrices, fromContainer: gltfContainer, from: filepath) else {
-        return nil
+    let data = try FileReader.readFile(at: filepath)
+    if data.prefix(4) == Data([0x67, 0x6c, 0x54, 0x46]) {
+      throw GLTFLoadingError.unsupportedFeature(
+        "GLB containers; use .gltf with external .bin buffers")
+    }
+    let container = try JSONDecoder().decode(GLTFContainer.self, from: data)
+    let reader = try AccessorReader(container: container, fileURL: filepath)
+    let meshes = try container.meshes.map { mesh in
+      let primitives = try mesh.primitives.map {
+        try primitive($0, container: container, reader: reader, filepath: filepath)
       }
-
-      let inverseMatrices: [simd_float4x4] = try .from(data: data)
-
-      return Skin(inverseBindMatrices: inverseMatrices, joints: skin.joints)
-    } ?? []
-  }
-
-  func mapMeshes(of gltfContainer: GLTFContainer, from filepath: URL) throws -> [Mesh] {
-    return try gltfContainer.meshes.compactMap({ mesh in
-      let publicPrimitives: [Primitive] = try mesh.primitives.concurrentMap({ primitive in
-        guard let primitiveInterleavedData = try self.extractAndInterleaveData(forPrimitive: primitive, fromContainer: gltfContainer, from: filepath) else {
-          return nil
+      let targetCount = primitives.first?.morphTargets.count ?? 0
+      guard primitives.allSatisfy({ $0.morphTargets.count == targetCount }),
+        mesh.weights == nil || mesh.weights?.count == targetCount,
+        (mesh.weights ?? []).allSatisfy({ $0.isFinite })
+      else { throw invalid("Inconsistent mesh morph targets or weights.") }
+      return Mesh(
+        primitives: primitives, weights: mesh.weights ?? .init(repeating: 0, count: targetCount))
+    }
+    for node in container.nodes {
+      if let weights = node.weights {
+        guard let mesh = node.mesh, meshes.indices.contains(mesh),
+          weights.count == meshes[mesh].weights.count,
+          weights.allSatisfy({ $0.isFinite })
+        else { throw invalid("Invalid node morph weights.") }
+      }
+    }
+    let skins = try (container.skins ?? []).map { skin -> Skin in
+      guard skin.joints.allSatisfy({ container.nodes.indices.contains($0) }) else {
+        throw invalid("Skin joint node is out of range.")
+      }
+      let matrices: [simd_float4x4]
+      if let index = skin.inverseBindMatrices {
+        let values = try reader.floats(index, expectedType: .mat4)
+        guard values.count == skin.joints.count * 16 else {
+          throw invalid("Inverse bind matrix count does not match joints.")
         }
-
-        return Primitive(
-          indices: primitiveInterleavedData.indices,
-          vertices: primitiveInterleavedData.vertices,
-          boundingBox: primitiveInterleavedData.boundingBox ?? (.zero, .zero),
-          material: primitiveInterleavedData.material.map {
-            Material(material: $0, in: gltfContainer, relativeTo: filepath)
-          }
-        )
-      })
-
-      return Mesh(primitives: publicPrimitives)
-    })
+        matrices = stride(from: 0, to: values.count, by: 16).map { i in
+          simd_float4x4(
+            simd_float4(values[i], values[i + 1], values[i + 2], values[i + 3]),
+            simd_float4(values[i + 4], values[i + 5], values[i + 6], values[i + 7]),
+            simd_float4(values[i + 8], values[i + 9], values[i + 10], values[i + 11]),
+            simd_float4(values[i + 12], values[i + 13], values[i + 14], values[i + 15]))
+        }
+      } else {
+        matrices = .init(repeating: matrix_identity_float4x4, count: skin.joints.count)
+      }
+      return Skin(inverseBindMatrices: matrices, joints: skin.joints)
+    }
+    let animations = try clips(container: container, meshes: meshes, reader: reader)
+    return GLTFAsset(
+      scenes: container.scenes, nodes: container.nodes, meshes: meshes, skins: skins,
+      accessors: container.accessors, animations: animations)
   }
 
-  func extractAndInterleaveData(forPrimitive primitive: GLTFPrimitive, fromContainer container: GLTFContainer, from filepath: URL) throws -> (
-    vertices: [Vertex],
-    indices: [UInt32],
-    boundingBox: (min: simd_float3, max: simd_float3)?,
-    material: GLTFMaterial?
-  )? {
-
-    let indices: [UInt32]
+  private func primitive(
+    _ primitive: GLTFPrimitive, container: GLTFContainer, reader: AccessorReader, filepath: URL
+  ) throws -> Primitive {
+    guard (primitive.mode ?? 4) == 4 else {
+      throw GLTFLoadingError.unsupportedFeature("Non-triangle primitives")
+    }
     let positions: [simd_float3]
-    let boundingBox: (min: simd_float3, max: simd_float3)?
-
-    var normals: [simd_float3]? = nil
-    var joints: [simd_uchar4]? = nil
-    var colors: [simd_float4]? = nil
-    var textureCoordinates: [simd_float2]? = nil
-
-    var weights: [simd_float4]? = nil
-
-    if let decompressedBuffers = try extractData(for: primitive, attribute: .position, from: container, from: filepath) {
-      positions = try .from(data: decompressedBuffers.positions)
-      normals = try decompressedBuffers.normals.map {
-        try .from(data: $0)
+    let indices: [UInt32]
+    let normals: [simd_float3]?
+    let colors: [simd_float4]?
+    let uv: [simd_float2]?
+    let joints: [simd_uchar4]?
+    let weights: [simd_float4]?
+    if let draco = primitive.extensions?.dracoExtension {
+      let decoded = try decompressDracoBuffer(reader.view(draco.bufferView))
+      positions = try .from(data: decoded.positions)
+      indices = decoded.indices.withUnsafeBytes { bytes in
+        stride(from: 0, to: bytes.count, by: 4).map {
+          bytes.loadUnaligned(fromByteOffset: $0, as: UInt32.self)
+        }
       }
-
-      colors = try decompressedBuffers.colors.map {
+      normals = try decoded.normals.map { try .from(data: $0) }
+      colors = try decoded.colors.map {
         try .from(data: $0, componentType: .float, dataType: .vec3, normalize: false)
       }
-
-      textureCoordinates = try decompressedBuffers.textureCoordinates.map {
+      uv = try decoded.textureCoordinates.map {
         try .from(data: $0, componentType: .float, normalize: false)
       }
-
-      weights = try decompressedBuffers.weights.map {
+      joints = try decoded.joints.map { try .from(data: $0) }
+      weights = try decoded.weights.map {
         try .from(data: $0, componentType: .float, normalize: false)
       }
-
-      // TODO: Verify that this is correct?
-      joints = try decompressedBuffers.joints.map {
-        try .from(data: $0)
-      }
-
-      // TODO: Support texture coordinates.
-
-      let indexCount = decompressedBuffers.indices.count / MemoryLayout<UInt32>.size
-      let mappedIndices = decompressedBuffers.indices.withUnsafeBytes { buffer in
-        Array(UnsafeBufferPointer<UInt32>(start: buffer.bindMemory(to: UInt32.self).baseAddress!, count: indexCount))
-      }
-
-      indices = mappedIndices
-
-      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container)
     } else {
-      guard
-        let positionsData = extractData(forAccessor: primitive.attributes.POSITION, fromContainer: container, from: filepath),
-        let indicesAccessorIndex = primitive.indices
-      else {
-        throw DataLoadingError.missingData
+      guard let positionIndex = primitive.attributes.POSITION else {
+        throw invalid("Primitive has no POSITION accessor.")
       }
-
-      indices = try extractIndicesData(for: indicesAccessorIndex, in: container, offset: 0, from: filepath)
-      boundingBox = extractBoundingBox(for: primitive.attributes.POSITION, fromContainer: container)
-      positions = try .from(data: positionsData)
-
-      normals = try primitive.attributes.NORMAL.flatMap { normalsAccessorIndex in
-        guard let data = extractData(forAccessor: normalsAccessorIndex, fromContainer: container, from: filepath) else {
-          return nil
+      positions = try vectors3(positionIndex, reader: reader)
+      indices =
+        try primitive.indices.map { try reader.indices($0) } ?? positions.indices.map { UInt32($0) }
+      normals = try primitive.attributes.NORMAL.map { try vectors3($0, reader: reader) }
+      if let colorIndex = primitive.attributes.COLOR_0 {
+        let descriptor = try reader.accessor(colorIndex)
+        guard descriptor.type == .vec3 || descriptor.type == .vec4 else {
+          throw invalid("Vertex colors must be VEC3 or VEC4.")
         }
-
-        return try .from(data: data)
-      }
-
-      joints = try primitive.attributes.JOINTS_0.flatMap { jointsAccessorIndex in
-        guard let data = extractData(forAccessor: jointsAccessorIndex, fromContainer:container, from: filepath) else {
-          return nil
+        let values = try reader.floats(colorIndex)
+        let size = descriptor.type.numberOfComponents
+        colors = stride(from: 0, to: values.count, by: size).map { i in
+          simd_float4(values[i], values[i + 1], values[i + 2], size == 4 ? values[i + 3] : 1)
         }
-
-        return try .from(data: data)
-      }
-
-      colors = try primitive.attributes.COLOR_0.flatMap { colorsAccessorIndex in
-        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, from: filepath) else {
-          return nil
-        }
-
-        // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
-        let accessor = container.accessors[colorsAccessorIndex]
-        return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
-      }
-
-      textureCoordinates = try primitive.attributes.TEXCOORD_0.flatMap { colorsAccessorIndex in
-        guard let data = extractData(forAccessor: colorsAccessorIndex, fromContainer: container, from: filepath) else {
-          return nil
-        }
-
-        // TODO: Optimization – Instead of referencing the accessor directly here we should return it from the extact data function.
-        let accessor = container.accessors[colorsAccessorIndex]
-        return try .from(data: data, componentType: accessor.componentType, dataType: accessor.type, normalize: accessor.normalized ?? false)
-      }
-
-      weights = try primitive.attributes.WEIGHTS_0.flatMap { weightsAccessorIndex in
-        guard let data = extractData(forAccessor: weightsAccessorIndex, fromContainer: container, from: filepath) else {
-          return nil
-        }
-
-        let accessor = container.accessors[weightsAccessorIndex]
-        return try .from(data: data, componentType: accessor.componentType, normalize: accessor.normalized ?? false)
-      }
-    }
-
-    let material: GLTFMaterial? = {
-      if let accessor = primitive.material, let material = container.materials?[accessor] {
-        return material
       } else {
-        return nil
+        colors = nil
       }
-    }()
-
-    var vertices: [Vertex] = []
-    for (index, position) in positions.enumerated() {
-      let vertex = Vertex(
-        position: position,
-        normal: normals?[safe: index] ?? simd_float3(0, 0, 0),
-        color: colors?[safe: index] ?? simd_float4(1, 1, 1, 1),
-        uv: textureCoordinates?[safe: index] ?? .zero,
-        joints: joints?[safe: index],
-        weights: weights?[safe: index]
-      )
-      vertices.append(vertex)
-    }
-
-    return (vertices: vertices, indices: indices, boundingBox: boundingBox, material: material)
-  }
-
-  private func load(file filepath: URL) throws -> GLTFContainer {
-    let jsonData = try FileReader.readFile(at: filepath)
-    let decoder = JSONDecoder()
-    let gltfContainer = try decoder.decode(GLTFContainer.self, from: jsonData)
-
-    return gltfContainer
-  }
-
-  private func extractIndicesData(for accessorIndex: Int, in gltfContainer: GLTFContainer, offset: Int, from filepath: URL) throws -> [UInt32] {
-    let accessor = gltfContainer.accessors[accessorIndex]
-    guard let bufferViewIndex = accessor.bufferView else {
-      return []
-    }
-
-    let bufferView = gltfContainer.bufferViews[bufferViewIndex]
-    let buffer = gltfContainer.buffers[bufferView.buffer]
-    let gltfDirectory = filepath.deletingLastPathComponent()
-    let bufferURL = gltfDirectory.appendingPathComponent(buffer.uri ?? "")
-    let binaryData = try Data(contentsOf: bufferURL)
-
-    let dataStart = bufferView.byteOffset
-    let count = accessor.count
-    var indices: [UInt32] = []
-
-    let batchSize = 1024
-    indices.reserveCapacity(count)
-    let offsetAddition = UInt32(offset)
-
-    binaryData.withUnsafeBytes { bytes in
-      switch accessor.componentType {
-      case .unsignedByte:
-        for batchStart in stride(from: 0, to: count, by: batchSize) {
-          let batchEnd = min(batchStart + batchSize, count)
-
-          for i in batchStart..<batchEnd {
-            let index = UInt32(bytes[dataStart + i])
-            indices.append(index + offsetAddition)
-          }
+      if let index = primitive.attributes.TEXCOORD_0 {
+        let values = try reader.floats(index, expectedType: .vec2)
+        uv = stride(from: 0, to: values.count, by: 2).map {
+          simd_float2(values[$0], values[$0 + 1])
         }
-
-      case .unsignedShort:
-        let pointer = bytes.baseAddress!.assumingMemoryBound(to: UInt16.self)
-        for batchStart in stride(from: 0, to: count, by: batchSize) {
-          let batchEnd = min(batchStart + batchSize, count)
-
-          for i in batchStart..<batchEnd {
-            let index = pointer[(dataStart / MemoryLayout<UInt16>.stride) + i]
-            indices.append(UInt32(index) + offsetAddition)
-          }
+      } else {
+        uv = nil
+      }
+      if let index = primitive.attributes.JOINTS_0 {
+        let descriptor = try reader.accessor(index)
+        guard [.unsignedByte, .unsignedShort].contains(descriptor.componentType),
+          descriptor.normalized != true
+        else { throw invalid("Invalid joint component type.") }
+        let values = try reader.floats(index, expectedType: .vec4)
+        guard values.allSatisfy({ $0 >= 0 && $0 <= 255 }) else {
+          throw GLTFLoadingError.unsupportedFeature("Joint indices above 255")
         }
-
-      case .unsignedInt:
-        let pointer = bytes.baseAddress!.assumingMemoryBound(to: UInt32.self)
-        for batchStart in stride(from: 0, to: count, by: batchSize) {
-          let batchEnd = min(batchStart + batchSize, count)
-
-          for i in batchStart..<batchEnd {
-            let index = pointer[(dataStart / MemoryLayout<UInt32>.stride) + i]
-            indices.append(index + offsetAddition)
-          }
+        joints = stride(from: 0, to: values.count, by: 4).map {
+          simd_uchar4(
+            UInt8(values[$0]), UInt8(values[$0 + 1]), UInt8(values[$0 + 2]), UInt8(values[$0 + 3]))
         }
-      default:
-        fatalError("Unsupported type for indices")
+      } else {
+        joints = nil
+      }
+      if let index = primitive.attributes.WEIGHTS_0 {
+        let values = try reader.floats(index, expectedType: .vec4)
+        weights = stride(from: 0, to: values.count, by: 4).map {
+          simd_float4(values[$0], values[$0 + 1], values[$0 + 2], values[$0 + 3])
+        }
+      } else {
+        weights = nil
       }
     }
-
-    return indices
+    guard !positions.isEmpty,
+      positions.allSatisfy({ $0.x.isFinite && $0.y.isFinite && $0.z.isFinite }),
+      indices.count % 3 == 0, indices.allSatisfy({ UInt64($0) < UInt64(positions.count) })
+    else { throw invalid("Invalid primitive vertices or indices.") }
+    for count in [normals?.count, colors?.count, uv?.count, joints?.count, weights?.count]
+      .compactMap({ $0 })
+    {
+      guard count == positions.count else { throw invalid("Vertex attribute count mismatch.") }
+    }
+    let targets = try (primitive.targets ?? []).map { attributes -> MorphTarget in
+      let positionsDelta = try attributes.POSITION.map { try vectors3($0, reader: reader) }
+      let normalsDelta = try attributes.NORMAL.map { try vectors3($0, reader: reader) }
+      let tangentsDelta = try attributes.TANGENT.map { try vectors3($0, reader: reader) }
+      guard positionsDelta != nil || normalsDelta != nil || tangentsDelta != nil else {
+        throw invalid("Empty morph target.")
+      }
+      for count in [positionsDelta?.count, normalsDelta?.count, tangentsDelta?.count].compactMap({
+        $0
+      }) {
+        guard count == positions.count else { throw invalid("Morph target vertex count mismatch.") }
+      }
+      return MorphTarget(positions: positionsDelta, normals: normalsDelta, tangents: tangentsDelta)
+    }
+    let vertices = positions.indices.map { i in
+      Vertex(
+        position: positions[i], normal: normals?[i] ?? .zero, color: colors?[i] ?? .one,
+        uv: uv?[i] ?? .zero, joints: joints?[i], weights: weights?[i])
+    }
+    let low = positions.reduce(simd_float3(repeating: .greatestFiniteMagnitude)) {
+      simd.min($0, $1)
+    }
+    let high = positions.reduce(simd_float3(repeating: -.greatestFiniteMagnitude)) {
+      simd.max($0, $1)
+    }
+    let material = primitive.material.flatMap { container.materials?[safe: $0] }.map {
+      Material(material: $0, in: container, relativeTo: filepath)
+    }
+    return Primitive(
+      indices: indices, vertices: vertices, boundingBox: (low, high), material: material,
+      morphTargets: targets)
   }
 
-  func dataForBuffer(_ buffer: GLTFBuffer, offset: Int, length: Int, from filepath: URL) -> Data {
-    do {
-      let gltfDirectory = filepath.deletingLastPathComponent()
-      let bufferURL = gltfDirectory.appendingPathComponent(buffer.uri ?? "")
-      let fileData = try Data(contentsOf: bufferURL)
-      guard offset + length <= fileData.count else {
-        print("Requested data range exceeds file size.")
-        return Data()
-      }
-      return fileData.subdata(in: offset..<(offset + length))
-    } catch {
-      print("Failed to read buffer data: \(error.localizedDescription)")
-      return Data()
+  private func vectors3(_ index: Int, reader: AccessorReader) throws -> [simd_float3] {
+    let values = try reader.floats(index, expectedType: .vec3)
+    return stride(from: 0, to: values.count, by: 3).map {
+      simd_float3(values[$0], values[$0 + 1], values[$0 + 2])
     }
   }
+
+  private func clips(container: GLTFContainer, meshes: [Mesh], reader: AccessorReader) throws
+    -> [AnimationClip]
+  {
+    try (container.animations ?? []).map { animation in
+      let samplers = try animation.samplers.map { sampler -> AnimationSampler in
+        let input = try reader.accessor(sampler.input)
+        let output = try reader.accessor(sampler.output)
+        guard input.componentType == .float, output.componentType == .float else {
+          throw invalid("Animation inputs and outputs must be FLOAT accessors.")
+        }
+        let times = try reader.floats(sampler.input, expectedType: .scalar)
+        guard !times.isEmpty, times[0] >= 0, zip(times, times.dropFirst()).allSatisfy({ $0 < $1 })
+        else { throw invalid("Animation times must be nonnegative and strictly increasing.") }
+        let values = try reader.floats(sampler.output)
+        let interpolation = sampler.interpolation ?? .linear
+        let groups = times.count.multipliedReportingOverflow(
+          by: interpolation == .cubicSpline ? 3 : 1)
+        guard !groups.overflow, !values.isEmpty, values.count % groups.partialValue == 0 else {
+          throw invalid("Animation output count does not match input times.")
+        }
+        return AnimationSampler(
+          times: times, values: values, interpolation: interpolation,
+          componentsPerValue: values.count / groups.partialValue)
+      }
+      let channels = try animation.channels.map { channel -> AnimationChannel in
+        guard samplers.indices.contains(channel.sampler), let nodeIndex = channel.target.node,
+          container.nodes.indices.contains(nodeIndex)
+        else { throw invalid("Animation sampler or target node is out of range.") }
+        let sampler = samplers[channel.sampler]
+        let output = try reader.accessor(animation.samplers[channel.sampler].output)
+        switch channel.target.path {
+        case .weights:
+          guard let mesh = container.nodes[nodeIndex].mesh, meshes.indices.contains(mesh),
+            !meshes[mesh].weights.isEmpty, sampler.componentsPerValue == meshes[mesh].weights.count,
+            output.type == .scalar
+          else { throw invalid("Weights animation does not match the node's morph targets.") }
+        case .rotation:
+          guard sampler.componentsPerValue == 4, output.type == .vec4 else {
+            throw invalid("Rotation animation must have VEC4 values.")
+          }
+        case .translation, .scale:
+          guard sampler.componentsPerValue == 3, output.type == .vec3 else {
+            throw invalid("Translation/scale animation must have VEC3 values.")
+          }
+        }
+        return AnimationChannel(
+          samplerIndex: channel.sampler, targetNodeIndex: nodeIndex, targetPath: channel.target.path
+        )
+      }
+      return AnimationClip(name: animation.name, samplers: samplers, channels: channels)
+    }
+  }
+
+  private func invalid(_ message: String) -> GLTFLoadingError { .invalidData(message) }
 }

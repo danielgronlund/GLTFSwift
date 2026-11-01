@@ -76,10 +76,28 @@ public struct Primitive {
   public let vertices: [Vertex]
   public let boundingBox: (min: simd_float3, max: simd_float3)?
   public let material: Material?
+  /// Local-space deltas, in the same vertex order as `vertices`.
+  public let morphTargets: [MorphTarget]
+
+  public init(indices: [UInt32], vertices: [Vertex], boundingBox: (min: simd_float3, max: simd_float3)?,
+              material: Material?, morphTargets: [MorphTarget] = []) {
+    self.indices = indices
+    self.vertices = vertices
+    self.boundingBox = boundingBox
+    self.material = material
+    self.morphTargets = morphTargets
+  }
 }
 
 public struct Mesh {
   public let primitives: [Primitive]
+  /// Default morph weights. Node.weights overrides these when present.
+  public let weights: [Float]
+
+  public init(primitives: [Primitive], weights: [Float] = []) {
+    self.primitives = primitives
+    self.weights = weights
+  }
 }
 
 public struct Skin {
@@ -93,14 +111,16 @@ public class GLTFAsset {
   public let meshes: [Mesh]
 
   public let skins: [Skin]?
+  public let animations: [AnimationClip]
   let accessors: [GLTFAccessor]
 
-  init(scenes: [GLTFScene], nodes: [GLTFNode], meshes: [Mesh], skins: [Skin]?, accessors: [GLTFAccessor]) {
+  init(scenes: [GLTFScene], nodes: [GLTFNode], meshes: [Mesh], skins: [Skin]?, accessors: [GLTFAccessor], animations: [AnimationClip] = []) {
     self.scenes = scenes
     self.nodes = nodes
     self.meshes = meshes
     self.skins = skins
     self.accessors = accessors
+    self.animations = animations
   }
 
   public subscript(_ name: String) -> GLTFNode? {

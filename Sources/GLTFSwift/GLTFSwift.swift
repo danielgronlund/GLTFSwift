@@ -7,6 +7,8 @@ struct GLTFContainer: Decodable {
   let nodes: [GLTFNode]
   let meshes: [GLTFMesh]
   let skins: [GLTFSkin]?
+  let animations: [GLTFAnimation]?
+  let extensionsRequired: [String]?
   let asset: GLTFAssetInfo
   let buffers: [GLTFBuffer]
   let bufferViews: [GLTFBufferView]
@@ -39,9 +41,10 @@ public class GLTFNode: Decodable {
 
   public let skin: Int?
   public let name: String?
+  public let weights: [Float]?
 
   enum CodingKeys: String, CodingKey {
-    case mesh, skin, children, name, translation, rotation, scale, matrix
+    case mesh, skin, children, name, translation, rotation, scale, matrix, weights
   }
 
   required public init(from decoder: Decoder) throws {
@@ -52,6 +55,7 @@ public class GLTFNode: Decodable {
     skin = try container.decodeIfPresent(Int.self, forKey: .skin)
     children = try container.decodeIfPresent([Int].self, forKey: .children)
     name = try container.decodeIfPresent(String.self, forKey: .name)
+    weights = try container.decodeIfPresent([Float].self, forKey: .weights)
 
     let neutralRotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
 
@@ -110,6 +114,7 @@ public class GLTFNode: Decodable {
 struct GLTFMesh: Decodable {
   let primitives: [GLTFPrimitive]
   let name: String?
+  let weights: [Float]?
 }
 
 // MARK: - Material
@@ -198,10 +203,12 @@ struct GLTFPrimitive: Decodable {
   let attributes: GLTFAttributes
   let material: Int?
   let extensions: PrimitiveExtensions?
+  let targets: [GLTFAttributes]?
+  let mode: Int?
 }
 
 struct PrimitiveExtensions: Decodable {
-  let dracoExtension: DracoExtension
+  let dracoExtension: DracoExtension?
   enum CodingKeys: String, CodingKey {
     case dracoExtension = "KHR_draco_mesh_compression"
   }
@@ -281,6 +288,7 @@ struct GLTFAccessor: Decodable {
   let max: [Float]?
   let min: [Float]?
   let byteOffset: Int?
+  let sparse: UnsupportedSparseAccessor?
 
   var boundingBox: (min: simd_float3, max: simd_float3)? {
     guard
@@ -308,14 +316,52 @@ struct GLTFBuffer: Decodable {
 // MARK: - BufferView
 struct GLTFBufferView: Decodable {
   let buffer: Int
-  let byteOffset: Int
+  let byteOffset: Int?
   let byteLength: Int
   let byteStride: Int?
   let target: BufferType?
+  let extensions: BufferViewExtensions?
 }
 
 enum BufferType: Int, Decodable {
   case unknown = 0
   case vertex = 34962
   case index = 34963
+}
+
+// Deliberately recognized so unsupported sparse data produces an explicit error.
+struct UnsupportedSparseAccessor: Decodable {}
+
+struct BufferViewExtensions: Decodable {
+  let meshopt: MeshoptCompression?
+  enum CodingKeys: String, CodingKey { case meshopt = "EXT_meshopt_compression" }
+}
+
+struct MeshoptCompression: Decodable {
+  let buffer: Int
+  let byteOffset: Int?
+  let byteLength: Int
+  let byteStride: Int
+  let count: Int
+  let mode: String
+  let filter: String?
+}
+
+struct GLTFAnimation: Decodable {
+  let name: String?
+  let samplers: [GLTFAnimationSampler]
+  let channels: [GLTFAnimationChannel]
+}
+struct GLTFAnimationSampler: Decodable {
+  let input: Int
+  let output: Int
+  let interpolation: AnimationInterpolation?
+}
+struct GLTFAnimationChannel: Decodable {
+  let sampler: Int
+  let target: GLTFAnimationTarget
+}
+struct GLTFAnimationTarget: Decodable {
+  let node: Int?
+  let path: AnimationTargetPath
 }
