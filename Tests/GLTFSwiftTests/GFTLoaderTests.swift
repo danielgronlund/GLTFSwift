@@ -2,11 +2,9 @@ import XCTest
 @testable import GLTFSwift
 
 final class FileLoadingTests: XCTestCase {
-  var device: MTLDevice!
   var loader: GLTFLoader!
 
   override func setUpWithError() throws {
-    self.device = MTLCreateSystemDefaultDevice()!
     self.loader = GLTFLoader()
     try super.setUpWithError()
   }

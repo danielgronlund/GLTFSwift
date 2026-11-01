@@ -1,0 +1,388 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "GLTFSwift feature fixture; meshoptimizer 1.2.0"
+  },
+  "extensionsRequired": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization"
+  ],
+  "extensionsUsed": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization"
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "weights": [
+        1,
+        0
+      ],
+      "translation": [
+        5,
+        0,
+        0
+      ],
+      "scale": [
+        2,
+        2,
+        2
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "weights": [
+        0.25,
+        0.75
+      ],
+      "primitives": [
+        {
+          "indices": 3,
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "targets": [
+            {
+              "POSITION": 4
+            },
+            {
+              "POSITION": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": [
+    {
+      "name": "Water",
+      "samplers": [
+        {
+          "input": 6,
+          "output": 7
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 0,
+            "path": "weights"
+          }
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 483,
+      "uri": "meshopt-features.bin"
+    },
+    {
+      "byteLength": 190,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "fallback": true
+        }
+      }
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 1,
+      "byteOffset": 0,
+      "byteLength": 24,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 0,
+          "byteLength": 59,
+          "byteStride": 8,
+          "count": 3,
+          "mode": "ATTRIBUTES",
+          "filter": "NONE"
+        }
+      },
+      "byteStride": 8
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 24,
+      "byteLength": 12,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 59,
+          "byteLength": 37,
+          "byteStride": 4,
+          "count": 3,
+          "mode": "ATTRIBUTES",
+          "filter": "OCTAHEDRAL"
+        }
+      },
+      "byteStride": 4
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 36,
+      "byteLength": 12,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 96,
+          "byteLength": 54,
+          "byteStride": 4,
+          "count": 3,
+          "mode": "ATTRIBUTES",
+          "filter": "NONE"
+        }
+      },
+      "byteStride": 4
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 48,
+      "byteLength": 6,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 150,
+          "byteLength": 18,
+          "byteStride": 2,
+          "count": 3,
+          "mode": "TRIANGLES",
+          "filter": "NONE"
+        }
+      }
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 54,
+      "byteLength": 24,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 168,
+          "byteLength": 41,
+          "byteStride": 8,
+          "count": 3,
+          "mode": "ATTRIBUTES",
+          "filter": "NONE"
+        }
+      },
+      "byteStride": 8
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 78,
+      "byteLength": 24,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 209,
+          "byteLength": 41,
+          "byteStride": 8,
+          "count": 3,
+          "mode": "ATTRIBUTES",
+          "filter": "NONE"
+        }
+      },
+      "byteStride": 8
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 102,
+      "byteLength": 8,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 250,
+          "byteLength": 47,
+          "byteStride": 4,
+          "count": 2,
+          "mode": "ATTRIBUTES",
+          "filter": "EXPONENTIAL"
+        }
+      },
+      "byteStride": 4
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 110,
+      "byteLength": 16,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 297,
+          "byteLength": 49,
+          "byteStride": 4,
+          "count": 4,
+          "mode": "ATTRIBUTES",
+          "filter": "NONE"
+        }
+      },
+      "byteStride": 4
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 126,
+      "byteLength": 24,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 346,
+          "byteLength": 12,
+          "byteStride": 4,
+          "count": 6,
+          "mode": "INDICES",
+          "filter": "NONE"
+        }
+      }
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 150,
+      "byteLength": 16,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 358,
+          "byteLength": 55,
+          "byteStride": 8,
+          "count": 2,
+          "mode": "ATTRIBUTES",
+          "filter": "QUATERNION"
+        }
+      },
+      "byteStride": 8
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 166,
+      "byteLength": 24,
+      "extensions": {
+        "EXT_meshopt_compression": {
+          "buffer": 0,
+          "byteOffset": 413,
+          "byteLength": 70,
+          "byteStride": 12,
+          "count": 2,
+          "mode": "ATTRIBUTES",
+          "filter": "EXPONENTIAL"
+        }
+      },
+      "byteStride": 12
+    }
+  ],
+  "accessors": [
+    {
+      "name": "positions",
+      "bufferView": 0,
+      "componentType": 5122,
+      "count": 3,
+      "type": "VEC3",
+      "normalized": true
+    },
+    {
+      "name": "normals",
+      "bufferView": 1,
+      "componentType": 5120,
+      "count": 3,
+      "type": "VEC3",
+      "normalized": true
+    },
+    {
+      "name": "uv",
+      "bufferView": 2,
+      "componentType": 5123,
+      "count": 3,
+      "type": "VEC2",
+      "normalized": true
+    },
+    {
+      "name": "triangles",
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 3,
+      "type": "SCALAR"
+    },
+    {
+      "name": "deltaA",
+      "bufferView": 4,
+      "componentType": 5122,
+      "count": 3,
+      "type": "VEC3",
+      "normalized": true
+    },
+    {
+      "name": "deltaB",
+      "bufferView": 5,
+      "componentType": 5122,
+      "count": 3,
+      "type": "VEC3",
+      "normalized": true
+    },
+    {
+      "name": "times",
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 2,
+      "type": "SCALAR"
+    },
+    {
+      "name": "weights",
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 4,
+      "type": "SCALAR"
+    },
+    {
+      "name": "sequence",
+      "bufferView": 8,
+      "componentType": 5125,
+      "count": 5,
+      "type": "SCALAR",
+      "byteOffset": 4
+    },
+    {
+      "name": "quaternions",
+      "bufferView": 9,
+      "componentType": 5122,
+      "count": 2,
+      "type": "VEC4",
+      "normalized": true
+    },
+    {
+      "name": "exponential",
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 2,
+      "type": "VEC3"
+    }
+  ],
+  "extras": {
+    "accessorMap": {
+      "positions": 0,
+      "normals": 1,
+      "uv": 2,
+      "triangles": 3,
+      "deltaA": 4,
+      "deltaB": 5,
+      "times": 6,
+      "weights": 7,
+      "sequence": 8,
+      "quaternions": 9,
+      "exponential": 10
+    }
+  }
+}
