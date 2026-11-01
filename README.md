@@ -5,6 +5,8 @@
 ### Features
 
 - **GLTF Parsing**: Load GLTF files to access scenes, nodes, meshes, and skins.
+- **Meshopt**: Decode compressed buffers and quantized, strided attributes.
+- **Deformation Data**: Import morph targets, weights, and animation timing for engine-controlled playback.
 - **Metal Buffer Conversion**: Convert parsed data into Metal buffers for
 
 ## Usage
@@ -12,8 +14,8 @@
 ```swift
 import GLTFSwift
 
-let scene = try Scene.load(from: "model.gltf", device: yourMetalDevice)
-// Use the loaded scene with your Metal setup
+let asset = try GLTFSwift.load("model.gltf")
+// Use asset.meshes and asset.animations in your engine.
 ```
 
 ### Disclaimer
